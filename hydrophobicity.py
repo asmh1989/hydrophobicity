@@ -14,7 +14,6 @@ from common import mkdir_by_file, vdw_radii
 from find_pocket import layer_grids
 from mol_surface import sa_surface_vec
 
-#water_layers = {1:-3000,2:-2700,3:-2200,4:-1400,5:-600,6:-200,7:-50,8:0}
 
 atomic_hydrophobicity_file_path = 'data/atomic_hydrophobicity.csv'
 atomic_hydrophobicity = pd.read_csv(
@@ -44,7 +43,7 @@ def get_accessible_solvent_area(sa, vdw_r, index, n=40):
     return (4*np.pi*np.square(vdw_r + 1.4) / n * sa[sa[:, -1] == index].shape[0])
 
 
-def find_within_radii(grid, atom_coors, elements, resns, sa, n=40):
+def find_within_radii_atoms(grid, atom_coors, elements, resns, sa, n=40):
     '''
     找到以grid为球心，半径=radii之内的所有原子,
     并返回 其坐标 , atomic_sovation_para, assessable_solvent_area, 
@@ -83,7 +82,21 @@ def get_grid_layer_value(grid):
     return grid[-1]
 
 
-def cal_hydro(felt_atoms):
+def find_within_radii_grids(grid, grids):
+    '''
+    grids: shape(n,4)
+    '''
+    d = np.sum(np.square(grid[:3] - grids[:, :3]), axis=1)
+    felt_grids = grids[d < 81.01]  # 9^2 + .1
+    d = np.sqrt(d[d < 81.01])
+    layer_velues = felt_grids[:, -1]
+    new_water_hydro = layer_velues.dot(
+        np.exp(-0.7*d)) / np.sum(np.exp(-0.7*d))
+    return np.insert(grid, 4, new_water_hydro)
+    # return(d, felt_grids)
+
+
+def cal_hydro_atoms(felt_atoms):
     hydro_atom = 0
     for atom in felt_atoms:
         atomic_sovation_para = atom[3]
@@ -93,36 +106,36 @@ def cal_hydro(felt_atoms):
     return hydro_atom
 
 
-def cal_grids_hydro(pocket_grids, atom_coors, elements, resns, solvent_accessible_points, n=40):
+def cal_grids_hydro(layerd_grids, atom_coors, elements, resns, solvent_accessible_points, n=40):
     '''
     for all grid points
-    protein_access_p: protein accessible points,半径要与sigmiod中用的半径相同！！
     pas_r: probe radii
     n:生成单位球时取点的个数，要与sas保持一致
     radii： 格点的寻找半径，在此范围内的atoms对格点的疏水性有影响
     '''
     grids_hydro = []
-    for grid in pocket_grids:
-        felt_atoms = find_within_radii(
+    for grid in layerd_grids:
+        felt_atoms = find_within_radii_atoms(
             grid, atom_coors, elements, resns, solvent_accessible_points, n=n)
-        felt_water = get_grid_layer_value(grid)
-        _hydro = cal_hydro(felt_atoms) + felt_water
-        grid = np.insert(grid, 3, _hydro)
+        new_layerd_grid = find_within_radii_grids(grid, layerd_grids)
+        _hydro = cal_hydro_atoms(felt_atoms) + \
+            get_grid_layer_value(new_layerd_grid)
+        grid = np.insert(grid[:3], 3, _hydro)
         grids_hydro.append(grid)
     grids_hydro = np.vstack(grids_hydro)
-    grids_hydro[:, -2] = grids_hydro[:, -2] * 0.1  # 为了显示，疏水性 * 0.1
+    grids_hydro[:, -1] = grids_hydro[:, -1] * 0.1  # 为了显示，疏水性 * 0.1
     return grids_hydro
 
 
 def run_hydro_vec(filename, n=40, pas_r=20, dir='.'):
     mkdir_by_file(dir, isDir=True)
     atom_coors, eles, resns = pdb_io.read_pdb(filename)
-    pocket_grids = layer_grids(
+    layered_grids = layer_grids(
         atom_coors, eles, n=n, pr=pas_r)
     pdb_io.to_pdb(
-        pocket_grids, '{}/{}_pocket_grids_layered.pdb'.format(dir, filename[:-4]))
+        layered_grids, '{}/{}_pocket_grids_layered.pdb'.format(dir, filename[:-4]))
     sa = sa_surface_vec(atom_coors, eles, n=n, pr=1.4)
     pdb_io.to_xyz(sa, '{}/{}_SAS.xyz'.format(dir, filename[:-4]))
-    hyo = cal_grids_hydro(pocket_grids, atom_coors, eles, resns, sa, n=n)
-    pdb_io.to_pdb(hyo, '{}_hyo.pdb'.format(filename[:-4]))
+    hyo = cal_grids_hydro(layered_grids, atom_coors, eles, resns, sa, n=n)
+    pdb_io.to_pdb(hyo, '{}/{}_hyo.pdb'.format(dir, filename[:-4]))
     print('Done')
