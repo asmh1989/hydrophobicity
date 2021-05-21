@@ -88,21 +88,7 @@ def connolly_surface(coors, elements, n=40, pr=1.4):
     dots = sa_surface_no_ele(sas_points[:, :-1], n=n, pr=pr)
     # return dots
 
-
-#    for index,sa_point in enumerate(sas_points):
-#        points = dots[dots[:,3] == index] #该sas point 产生的点
-#        coor = coors[int(sa_point[3])]
-#        d_ma = np.sum(np.square(coor - points[:,:-1]),axis=1)
-#        points = points[d_ma < np.square(2.8)]
-#        res.append(points)
-#    return np.vstack(res)
-#
-#        vec_sas_atom = sa_point[:-1] - coors[int(sa_point[3])] #sas点与原子的vector
-#        vec_sas_probe = sa_point[:-1] - points[:,:-1] #sas点与probe上点的vector
-#        v1 = vec_sas_atom / np.linalg.norm(vec_sas_atom)
-#        v2 = vec_sas_probe / np.linalg.norm(vec_sas_probe)
-#        cos_angle = v1.dot(v2.T) # cos values of angle bwtween vec_sas_atom and vec_sas_probe
-#        points = points[cos_angle > 0.95] #只要角度小于15°的
+    # 开始去除用于探测分子平面的点, 认为离中心点距离小于10都是分子平面内的点
     result = []
     for point in dots:
         for atom in coors:
