@@ -1,9 +1,14 @@
 import pandas as pd
 from biopandas.pdb import PandasPdb
 
+from common import mkdir_by_file
+
 
 def to_pdb(data, filename='test.pdb'):
     '''convert (xyz + b_facter + resnnum) to pdb file'''
+
+    mkdir_by_file(filename)
+
     lines = []
     for index, _t in enumerate(data):
         line = "{:<6s}".format("ATOM") + "{:>5d}".format(index + 1) + " "\
@@ -47,6 +52,9 @@ def group_bfacter(data, sep):
 
 
 def to_xyz(data, filename='test.xyz'):
+
+    mkdir_by_file(filename)
+
     t = pd.DataFrame(data)
     t.insert(0, 'atom', 'H')
     t.to_csv(filename, header=None, index=None, sep=' ')

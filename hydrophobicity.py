@@ -9,12 +9,10 @@ Created on Tue Apr 20 16:37:11 2021
 import numpy as np
 import pandas as pd
 
-from common import vdw_radii, mkdir_by_file
-
 import pdb_io
-
+from common import mkdir_by_file, vdw_radii
+from find_pocket import layer_grids
 from mol_surface import sa_surface_vec
-from find_water_and_pocket import layer_grids
 
 #water_layers = {1:-3000,2:-2700,3:-2200,4:-1400,5:-600,6:-200,7:-50,8:0}
 
@@ -117,7 +115,6 @@ def cal_grids_hydro(pocket_grids, atom_coors, elements, resns, solvent_accessibl
 
 
 def run_hydro_vec(filename, n=40, pas_r=20, dir='.'):
-
     mkdir_by_file(dir, isDir=True)
     atom_coors, eles, resns = pdb_io.read_pdb(filename)
     pocket_grids = layer_grids(

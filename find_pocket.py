@@ -18,12 +18,15 @@ Created on Mon Apr 12 09:03:24 2021
 # 打格点
 
 
-
-
 import numpy as np
 import pandas as pd
 from common import vdw_radii
-def gen_grid(coors, n=3, buffer=0):
+from mol_surface import sa_surface_vec
+probe_radiis = {7.0: -993, 6.3: -930, 5.6: -761,
+                4.9: -464, 4.2: -195, 3.5: -64, 2.8: -19, 2.1: -5}
+
+
+def gen_grid(coors, n=1, buffer=0):
     """ 
     coor: 分子的xyz
     n: 一埃内取点的个数
@@ -40,7 +43,7 @@ def gen_grid(coors, n=3, buffer=0):
     xx, yy, zz = np.meshgrid(x_range, y_range, z_range)
     # 将其用ravel展开成一维，放入dataframe中，并都标记为 1
     res = pd.DataFrame({'x': xx.ravel(), 'y': yy.ravel(), 'z': zz.ravel()})
-    return res.values
+    return res.values.astype('float64')
 
 
 def sas_search_del(coors, elements, grids, pr=1.4):
@@ -95,9 +98,16 @@ def pocket_search(water_grids, pocket_grids):
     return water_grids
 
 
+def find_pocket(atoms_coors, elements, n=40, pas_r=20):
+    pas = sa_surface_vec(atoms_coors, elements, n=n, pr=pas_r)
+    pocket_grids = gen_grid(atoms_coors, n=1)
+    pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)
+    pocket_grids = pas_search_for_pocket(pocket_grids, pas, n=n, pr=pas_r)
+    return pocket_grids
+
+
 def find_water(atoms_coors, elements, n=40, pas_r=20):
-    from mol_surface import mol_surface_Vec
-    pas = mol_surface_Vec.sa_surface_Vec(atoms_coors, elements, n=n, pr=pas_r)
+    pas = sa_surface_vec(atoms_coors, elements, n=n, pr=pas_r)
     pocket_grids = gen_grid(atoms_coors, n=1)
     pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)
     pocket_grids = pas_search_for_pocket(pocket_grids, pas, n=n, pr=pas_r)
@@ -108,5 +118,26 @@ def find_water(atoms_coors, elements, n=40, pas_r=20):
     water_grids = pocket_search(water_grids, pocket_grids)
     return (water_grids, pocket_grids)
 
-# if __name__ ==  '__main__':
-#    test('6FS6-mono_noe4z.xyz')
+
+def label_grids(grids, pas, pr=20):
+    '''
+    pas:protein accessible surface
+    找到所有以 pas 为圆心，半径=pr 圆内所有的 格点
+    并将其标记为 0
+    grids:经过sa_search_* 处理之后的格点
+    '''
+    for coor in pas[:, :3]:  # 循环pas中的每个点
+        d_ma = np.sum(np.square(coor - grids[:, :3]), axis=1)
+        indexes = np.where((d_ma < np.square(pr)) & (grids[:, 3] == 0))
+        grids[indexes, 3] = probe_radiis[pr]
+    return grids
+
+
+def layer_grids(coors, eles, n=40, pr=20):
+    pocket_grids = find_pocket(coors, eles, n=n, pas_r=pr)
+    grids = np.insert(pocket_grids, 3, 0, axis=1)  # 标记为0
+    for pr in probe_radiis:
+        surface_points = sa_surface_vec(
+            coors, eles, n=n, pr=pr)
+        labeled_grids = label_grids(grids, surface_points, pr=pr)
+    return labeled_grids

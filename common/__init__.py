@@ -2,6 +2,19 @@
 # A. Bondi (1964). "van der Waals Volumes and Radii". J. Phys. Chem. 68: 441. doi:10.1021/j100785a001
 #vdw_radii =  {"H" : 1.2,"C": 1.7,"N" : 1.55,"O" :1.52,"F" : 1.47,"P" : 1.8,"S" : 1.8,"Cl" : 1.75,"Mn":0.8}
 
+# 新建上层目录
+def mkdir_by_file(path, isDir=False):
+    from pathlib import Path
+
+    p = Path(path)
+
+    if isDir == False:
+        p = p.parent
+
+    if False == p.exists():
+        p.mkdir(parents=True)
+
+
 vdw_radii = {
     'C': 1.7,
     'CA': 1.7,
