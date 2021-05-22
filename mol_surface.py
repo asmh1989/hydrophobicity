@@ -8,7 +8,7 @@ ref: A fast algorithm for generating smooth molecular dot surface representation
 先生成分子的 extended-radius（er) surface，然后再在er surface上做probe，半径为1.4，水分子的半径
 最后去除probe之间的overlap
 
-潜在问题：当取点太少时，比如 50左右，会因为probe 与probe之间的overlap不够，导致部分点没法消除
+潜在问题：当取点太少时，比如 30左右，会因为probe 与probe之间的overlap不够，导致部分点没法消除
 
 @author: likun yang
 """
@@ -77,23 +77,30 @@ def sa_surface_no_ele(coors, n=40, pr=1.4):
     return(dots)
 
 
-def connolly_surface(coors, elements, n=40, pr=1.4):
+def connolly_surface(coors, elements, n=50, pr=1.4):
     '''   
-    结果 不如 mol_surface.py 好！
     coors: 体系的xyz坐标，shape：(m * 3)
     elements: 元素，shape：（m * 1))
     r:比vdw半径伸长的半径
     '''
-    sas_points = sa_surface_vec(coors, elements, n=int(n/2), pr=pr)  # 生成sas
-    dots = sa_surface_no_ele(sas_points[:, :-1], n=n, pr=pr)
+    sas_points = sa_surface_vec(coors, elements, n=n, pr=pr)  # 生成sas
+    dots = sa_surface_no_ele(
+        sas_points[:, :-1], n=n, pr=pr)  # 以sas为球心，pr为半径做球
     # return dots
 
-    # 开始去除用于探测分子平面的点, 认为离中心点距离小于10都是分子平面内的点
-    result = []
-    for point in dots:
-        for atom in coors:
-            d = np.sum(np.square(point[:-1] - atom))
-            if d < 10:
-                result.append(point)
-                break
-    return np.vstack(result)
+    # 开始去除探测小球最外面的点, 认为离原子距离的平方小于10.01都是内层的点
+    dots[:, 3] = 0  # label as 0
+    for atom in coors:
+        d = np.sum(np.square(atom - dots[:, :3]), axis=1)
+        indexes = np.where((d < 10.01) & (dots[:, 3] == 0))
+        dots[indexes, 3] = 1
+    return dots[dots[:, 3] == 1]
+
+    # result = []
+    # for point in dots:
+    #     for atom in coors:
+    #         d = np.sum(np.square(point[:-1] - atom))
+    #         if d < 10:
+    #             result.append(point)
+    #             break
+    # return np.vstack(result)
