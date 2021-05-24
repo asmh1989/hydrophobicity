@@ -35,7 +35,7 @@ def dotsphere(n=100):
     return(np.array([x, y, z]).T)
 
 
-def sa_surface_vec(coors, elements, n=40, pr=1.4):
+def sa_surface(coors, elements, n=40, pr=1.4):
     """ 生solvent accessible ,返回list，list的index为原子的序号
     coors: 体系的xyz坐标，shape：(m * 3)
     elements: 元素，shape：（m * 1))
@@ -83,7 +83,7 @@ def connolly_surface(coors, elements, n=50, pr=1.4):
     elements: 元素，shape：（m * 1))
     r:比vdw半径伸长的半径
     '''
-    sas_points = sa_surface_vec(coors, elements, n=n, pr=pr)  # 生成sas
+    sas_points = sa_surface(coors, elements, n=n, pr=pr)  # 生成sas
     dots = sa_surface_no_ele(
         sas_points[:, :-1], n=n, pr=pr)  # 以sas为球心，pr为半径做球
     # return dots

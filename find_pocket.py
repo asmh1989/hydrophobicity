@@ -21,7 +21,7 @@ Created on Mon Apr 12 09:03:24 2021
 import numpy as np
 import pandas as pd
 from core import vdw_radii
-from mol_surface import sa_surface_vec
+from mol_surface import sa_surface
 probe_radiis = {7.0: -993, 6.3: -930, 5.6: -761,
                 4.9: -464, 4.2: -195, 3.5: -64, 2.8: -19, 2.1: -5}
 
@@ -99,7 +99,7 @@ def pocket_search(water_grids, pocket_grids):
 
 
 def find_pocket(atoms_coors, elements, n=40, pas_r=20):
-    pas = sa_surface_vec(atoms_coors, elements, n=n, pr=pas_r)
+    pas = sa_surface(atoms_coors, elements, n=n, pr=pas_r)
     pocket_grids = gen_grid(atoms_coors, n=1)
     pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)
     pocket_grids = pas_search_for_pocket(pocket_grids, pas, n=n, pr=pas_r)
@@ -107,7 +107,7 @@ def find_pocket(atoms_coors, elements, n=40, pas_r=20):
 
 
 def find_water(atoms_coors, elements, n=40, pas_r=20):
-    pas = sa_surface_vec(atoms_coors, elements, n=n, pr=pas_r)
+    pas = sa_surface(atoms_coors, elements, n=n, pr=pas_r)
     pocket_grids = gen_grid(atoms_coors, n=1)
     pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)
     pocket_grids = pas_search_for_pocket(pocket_grids, pas, n=n, pr=pas_r)
@@ -137,7 +137,7 @@ def layer_grids(coors, eles, n=40, pr=20):
     pocket_grids = find_pocket(coors, eles, n=n, pas_r=pr)
     grids = np.insert(pocket_grids, 3, 0, axis=1)  # 标记为0
     for pr in probe_radiis:
-        surface_points = sa_surface_vec(
+        surface_points = sa_surface(
             coors, eles, n=n, pr=pr)
         labeled_grids = label_grids(grids, surface_points, pr=pr)
     return labeled_grids

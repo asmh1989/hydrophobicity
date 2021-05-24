@@ -13,7 +13,7 @@ import pandas as pd
 import pdb_io
 from core import mkdir_by_file, vdw_radii
 from find_pocket import layer_grids
-from mol_surface import sa_surface_vec
+from mol_surface import sa_surface
 
 
 atomic_hydrophobicity_file_path = 'data/atomic_hydrophobicity.csv'
@@ -133,7 +133,7 @@ def run_hydro(filename, n=40, pas_r=20, dir='.'):
     atom_coors, eles, resns = pdb_io.read_pdb(filename)
     layered_grids = layer_grids(
         atom_coors, eles, n=n, pr=pas_r)
-    sa = sa_surface_vec(atom_coors, eles, n=n, pr=1.4)
+    sa = sa_surface(atom_coors, eles, n=n, pr=1.4)
     pdb_io.to_xyz(sa, '{}/{}_SAS.xyz'.format(dir, filename[:-4]))
     hyo = cal_grids_hydro(layered_grids, atom_coors, eles, resns, sa, n=n)
     grid_coors = layered_grids[:, :3]

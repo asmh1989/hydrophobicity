@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from mol_surface import sa_surface_vec, connolly_surface
+from mol_surface import sa_surface, connolly_surface
 
 from pdb_io import to_xyz
 
@@ -10,11 +10,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def test_sa_surface_vec():
+def test_sa_surface():
     coor = np.array([[0, 0, 0], [0, 0, 2.7]])
     elements = np.array(['C', 'O'])
     dots = connolly_surface(coor, elements, n=100, pr=1.4)
-    to_xyz(dots, filename='test/test_sa_surface_vec_100.xyz')
+    to_xyz(dots, filename='test/test_sa_surface_100.xyz')
     # assert dots.shape[0] == 73
 
 
