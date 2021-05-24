@@ -20,7 +20,7 @@ Created on Mon Apr 12 09:03:24 2021
 
 import numpy as np
 import pandas as pd
-from common import vdw_radii
+from core import vdw_radii
 from mol_surface import sa_surface_vec
 probe_radiis = {7.0: -993, 6.3: -930, 5.6: -761,
                 4.9: -464, 4.2: -195, 3.5: -64, 2.8: -19, 2.1: -5}

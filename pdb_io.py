@@ -1,13 +1,15 @@
 import pandas as pd
+import numpy as np
 from biopandas.pdb import PandasPdb
 
-from common import mkdir_by_file
+from core import mkdir_by_file
 
 
-def to_pdb(data, filename='test.pdb'):
+def to_pdb(coors, bfactor, filename='test.pdb'):
     '''convert (xyz + b_facter + resnnum) to pdb file'''
 
     mkdir_by_file(filename)
+    data = np.insert(coors, 3, bfactor, axis=1)
 
     lines = []
     for index, _t in enumerate(data):

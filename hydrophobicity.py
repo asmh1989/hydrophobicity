@@ -7,10 +7,11 @@ Created on Tue Apr 20 16:37:11 2021
 计算pocket网格的疏水性
 """
 import numpy as np
+from numpy.core import einsumfunc
 import pandas as pd
 
 import pdb_io
-from common import mkdir_by_file, vdw_radii
+from core import mkdir_by_file, vdw_radii
 from find_pocket import layer_grids
 from mol_surface import sa_surface_vec
 
@@ -26,7 +27,7 @@ def get_atomic_sovation_para(resn, atom):
     if atom == 'OXT':
         atomic_sovation_para = -6  # termeial O,与残基无关
     elif atom == 'NA':
-        atomic_sovation_para = -12  # 因为pandas读取时会错误的将‘NA’认为 na（miss value)
+        atomic_sovation_para = -12  # 因为pandas读取时会错误的将‘NA’认为 na（missing value)
     else:
         index = np.where(((atomic_hydrophobicity[:, 0] == resn) & (
             atomic_hydrophobicity[:, 1] == atom)))
@@ -92,7 +93,7 @@ def find_within_radii_grids(grid, grids):
     layer_velues = felt_grids[:, -1]
     new_water_hydro = layer_velues.dot(
         np.exp(-0.7*d)) / np.sum(np.exp(-0.7*d))
-    return np.insert(grid, 4, new_water_hydro)
+    return new_water_hydro
     # return(d, felt_grids)
 
 
@@ -113,29 +114,29 @@ def cal_grids_hydro(layerd_grids, atom_coors, elements, resns, solvent_accessibl
     n:生成单位球时取点的个数，要与sas保持一致
     radii： 格点的寻找半径，在此范围内的atoms对格点的疏水性有影响
     '''
-    grids_hydro = []
-    for grid in layerd_grids:
+    atom_hydro = np.zeros(len(layerd_grids))
+    water_hydro = np.zeros(len(layerd_grids))
+    for index, grid in enumerate(layerd_grids):
         felt_atoms = find_within_radii_atoms(
             grid, atom_coors, elements, resns, solvent_accessible_points, n=n)
+        atom_hydro[index] = cal_hydro_atoms(felt_atoms)
         new_layerd_grid = find_within_radii_grids(grid, layerd_grids)
-        _hydro = cal_hydro_atoms(felt_atoms) + \
-            get_grid_layer_value(new_layerd_grid)
-        grid = np.insert(grid[:3], 3, _hydro)
-        grids_hydro.append(grid)
-    grids_hydro = np.vstack(grids_hydro)
-    grids_hydro[:, -1] = grids_hydro[:, -1] * 0.1  # 为了显示，疏水性 * 0.1
-    return grids_hydro
+        water_hydro[index] = new_layerd_grid
+    all_hydro = atom_hydro + water_hydro
+    #grids_hydro = np.insert(layerd_grids, 3, all_hydro, axis=1)
+    all_hydro = all_hydro * 0.1  # 为了显示，疏水性 * 0.1
+    return all_hydro
 
 
-def run_hydro_vec(filename, n=40, pas_r=20, dir='.'):
+def run_hydro(filename, n=40, pas_r=20, dir='.'):
     mkdir_by_file(dir, isDir=True)
     atom_coors, eles, resns = pdb_io.read_pdb(filename)
     layered_grids = layer_grids(
         atom_coors, eles, n=n, pr=pas_r)
-    pdb_io.to_pdb(
-        layered_grids, '{}/{}_pocket_grids_layered.pdb'.format(dir, filename[:-4]))
     sa = sa_surface_vec(atom_coors, eles, n=n, pr=1.4)
     pdb_io.to_xyz(sa, '{}/{}_SAS.xyz'.format(dir, filename[:-4]))
     hyo = cal_grids_hydro(layered_grids, atom_coors, eles, resns, sa, n=n)
-    pdb_io.to_pdb(hyo, '{}/{}_hyo.pdb'.format(dir, filename[:-4]))
+    grid_coors = layered_grids[:, :3]
+    pdb_io.to_pdb(grid_coors, hyo,
+                  filename='{}/{}_hyo.pdb'.format(dir, filename[:-4]))
     print('Done')

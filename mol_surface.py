@@ -15,7 +15,7 @@ ref: A fast algorithm for generating smooth molecular dot surface representation
 
 import numpy as np
 
-from common import vdw_radii
+from core import vdw_radii
 
 
 goldenRatio = (1 + 5**0.5)/2
