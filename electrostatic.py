@@ -15,13 +15,12 @@ charged_dict = {'ASP_OD1': -0.5, 'ASP_OD2': -0.5,
 
 
 def get_grids_elec(grids, charged_atoms, n=4):
-    res = []
-    for grid in grids:
+    elecs = np.zeros(len(grids))
+    for index, grid in enumerate(grids):
         #grid = grid.reshape((1,3))
         elec = cal_electro(grid, charged_atoms, n=n)
-        grid = np.insert(grid, 3, elec)
-        res.append(grid)
-    return (np.vstack(res))
+        elecs[index] = elec
+    return elecs
 
 
 def cal_electro(grid, charged_atoms, n=4):
@@ -55,7 +54,7 @@ def get_charge(coors, r_e):
     return np.vstack(res)
 
 
-def test(grids, coors, eles, residue_names):
+def run_electrosatatic(grids, coors, eles, residue_names):
     r_e = join(residue_names, eles)
     charged = get_charge(coors, r_e)
     return get_grids_elec(grids, charged, n=4)
