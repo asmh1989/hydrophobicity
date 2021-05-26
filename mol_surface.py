@@ -17,6 +17,8 @@ import numpy as np
 
 from core import vdw_radii
 
+from sz_py_ext import sa_surface as sa_surface_rust, sa_surface_no_ele as sa_surface_no_ele_rust
+
 
 goldenRatio = (1 + 5**0.5)/2
 
@@ -43,8 +45,9 @@ def sa_surface(coors, elements, n=40, pr=1.4):
     pr:probe radaii"""
 
     dots = np.zeros((len(coors) * n, 4))
+    _b = dotsphere(n=n)  # 生成圆上的点
+
     for i in range(coors.shape[0]):
-        _b = dotsphere(n=n)  # 生成圆上的点
         r = vdw_radii[elements[i]] + pr  # 半径
         _b = _b * r  # 根据 vdw半径对点进行放缩
         _c = _b + coors[i]  # 平移生成的圆
@@ -64,8 +67,9 @@ def sa_surface(coors, elements, n=40, pr=1.4):
 
 def sa_surface_no_ele(coors, n=40, pr=1.4):
     dots = np.zeros((len(coors) * n, 4))
+    _b = dotsphere(n=n)  # 生成圆上的点
+
     for i in range(coors.shape[0]):
-        _b = dotsphere(n=n)  # 生成圆上的点
         _b = _b * pr  # 根据 vdw半径对点进行放缩
         _c = _b + coors[i]  # 平移生成的圆
         _c = np.insert(_c, 3, i, axis=1)  # 加入原子序号
@@ -83,8 +87,8 @@ def connolly_surface(coors, elements, n=50, pr=1.4):
     elements: 元素，shape：（m * 1))
     r:比vdw半径伸长的半径
     '''
-    sas_points = sa_surface(coors, elements, n=n, pr=pr)  # 生成sas
-    dots = sa_surface_no_ele(
+    sas_points = sa_surface_rust(coors, elements, n=n, pr=pr)  # 生成sas
+    dots = sa_surface_no_ele_rust(
         sas_points[:, :-1], n=n, pr=pr)  # 以sas为球心，pr为半径做球
     # return dots
 
@@ -104,3 +108,21 @@ def connolly_surface(coors, elements, n=50, pr=1.4):
     #             result.append(point)
     #             break
     # return np.vstack(result)
+
+
+def connolly_surface2(coors, elements, n=50, pr=1.4):
+    '''   
+    coors: 体系的xyz坐标，shape：(m * 3)
+    elements: 元素，shape：（m * 1))
+    r:比vdw半径伸长的半径
+    '''
+    sas_points = sa_surface(coors, elements, n=n, pr=pr)  # 生成sas
+    dots = sa_surface_no_ele(
+        sas_points[:, :-1], n=n, pr=pr)  # 以sas为球心，pr为半径做球
+
+    dots[:, 3] = 0  # label as 0
+    for atom in coors:
+        d = np.sum(np.square(atom - dots[:, :3]), axis=1)
+        indexes = np.where((d < 10.01) & (dots[:, 3] == 0))
+        dots[indexes, 3] = 1
+    return dots[dots[:, 3] == 1]

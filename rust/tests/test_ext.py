@@ -1,5 +1,5 @@
 import numpy as np
-from sz_py_ext import axpy, conj, mult, cal_electro
+from sz_py_ext import axpy, conj, mult, cal_electro, sa_surface
 
 
 def test_axpy():
@@ -141,6 +141,15 @@ def test_cal_electro2():
 
 
 def test_cal_electro():
-
     a = cal_electro(grid, atoms, 4)
     print("a = ", a)
+
+
+def test_sa_surface():
+    coor = np.array([[0, 0, 0], [0, 0, 1.7]])
+    # elements = ['C', 'O']
+    elements = np.array(['C', 'O'])
+
+    dots = sa_surface(coor, elements, 1000, 1.4)
+    # dot2 = np.array(dots)
+    print("dots flags: ", dots.flags)

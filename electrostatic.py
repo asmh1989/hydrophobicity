@@ -7,7 +7,7 @@ Created on Fri May  7 14:38:41 2021
 """
 
 import numpy as np
-from sz_py_ext import cal_electro
+from sz_py_ext import cal_electro as cal_electro_rust
 
 charged_dict = {'ASP_OD1': -0.5, 'ASP_OD2': -0.5,
                 'GLU_OE1': -0.5, 'GLU_OE2': -0.5,
@@ -33,7 +33,7 @@ def cal_electro(grid, charged_atoms, n=4):
             .dot(charged_atoms[:, -1])
     (1/(4*np.pi*n)) * tmp
     '''
-    return cal_electro(grid, charged_atoms, n)
+    return cal_electro_rust(grid, charged_atoms, n)
 
 
 def join(r, e):

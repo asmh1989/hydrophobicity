@@ -1,10 +1,17 @@
+#![allow(dead_code)]
+
 use ndarray::{ArrayD, ArrayViewD, ArrayViewMutD};
-use numpy::{c64, IntoPyArray, PyArrayDyn, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn};
+use numpy::{
+    c64, npyffi::NPY_ARRAY_WRITEABLE, IntoPyArray, PyArray2, PyArrayDyn, PyReadonlyArray1,
+    PyReadonlyArray2, PyReadonlyArrayDyn,
+};
 use pyo3::prelude::{pymodule, PyModule, PyResult, Python};
 
-use crate::electrostatic::cal_electro;
+use crate::{electrostatic::cal_electro, surface::sa_surface};
 
+mod config;
 mod electrostatic;
+mod surface;
 
 #[pymodule]
 pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -57,6 +64,37 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         n: usize,
     ) -> f64 {
         cal_electro(grid.as_array(), atoms.as_array(), n)
+    }
+
+    #[pyfn(m, "sa_surface")]
+    fn sa_surface_py<'py>(
+        py: Python<'py>,
+        coors: PyReadonlyArray2<'_, f64>,
+        elements: Vec<&str>,
+        n: usize,
+        pr: f64,
+    ) -> &'py PyArray2<f64> {
+        // println!("elements = {:?}", elements);
+        let dot =
+            sa_surface(&coors.as_array(), Some(&elements), Some(n), Some(pr)).into_pyarray(py);
+        unsafe {
+            (*dot.as_array_ptr()).flags |= NPY_ARRAY_WRITEABLE;
+        }
+        dot
+    }
+
+    #[pyfn(m, "sa_surface_no_ele")]
+    fn sa_surface_no_ele_py<'py>(
+        py: Python<'py>,
+        coors: PyReadonlyArray2<'_, f64>,
+        n: usize,
+        pr: f64,
+    ) -> &'py PyArray2<f64> {
+        let dot = sa_surface(&coors.as_array(), None, Some(n), Some(pr)).into_pyarray(py);
+        unsafe {
+            (*dot.as_array_ptr()).flags |= NPY_ARRAY_WRITEABLE;
+        }
+        dot
     }
 
     Ok(())
