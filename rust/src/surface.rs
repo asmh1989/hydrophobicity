@@ -120,11 +120,12 @@ pub fn sa_surface(
     Array::from_shape_vec((ddd.len() / 4, 4), ddd.to_owned()).unwrap()
 }
 
+#[cfg(test)]
 mod tests {
     use log::info;
     use ndarray::array;
 
-    use crate::surface::*;
+    use crate::surface::{dotsphere, dotsphere2, sa_surface};
 
     #[test]
     fn test_surface() {
