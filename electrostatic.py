@@ -27,9 +27,13 @@ def cal_electro(grid, charged_atoms, n=4):
     '''
     n:介质的介电常数
     '''
-    tmp = np.sqrt(np.sum(
-        np.square(grid[:3] - charged_atoms[:, :3]), axis=1)).dot(charged_atoms[:, -1])
-    return (1/(4*np.pi*n)) * tmp
+
+    from sz_py_ext import cal_electro
+    return cal_electro(grid, charged_atoms, n)
+
+    # tmp = np.sqrt(np.sum(
+    #     np.square(grid[:3] - charged_atoms[:, :3]), axis=1)).dot(charged_atoms[:, -1])
+    # return (1/(4*np.pi*n)) * tmp
 
 
 def join(r, e):
