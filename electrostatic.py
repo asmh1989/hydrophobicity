@@ -7,6 +7,7 @@ Created on Fri May  7 14:38:41 2021
 """
 
 import numpy as np
+from sz_py_ext import cal_electro
 
 charged_dict = {'ASP_OD1': -0.5, 'ASP_OD2': -0.5,
                 'GLU_OE1': -0.5, 'GLU_OE2': -0.5,
@@ -26,14 +27,13 @@ def get_grids_elec(grids, charged_atoms, n=4):
 def cal_electro(grid, charged_atoms, n=4):
     '''
     n:介质的介电常数
+
+    调用rust写的扩展, 实现以下代码:
+    tmp = np.sqrt(np.sum(np.square(grid[:3] - charged_atoms[:, :3]), axis=1))
+            .dot(charged_atoms[:, -1])
+    (1/(4*np.pi*n)) * tmp
     '''
-
-    from sz_py_ext import cal_electro
     return cal_electro(grid, charged_atoms, n)
-
-    # tmp = np.sqrt(np.sum(
-    #     np.square(grid[:3] - charged_atoms[:, :3]), axis=1)).dot(charged_atoms[:, -1])
-    # return (1/(4*np.pi*n)) * tmp
 
 
 def join(r, e):
