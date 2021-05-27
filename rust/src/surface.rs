@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use ndarray::{concatenate, Array, ArrayBase, ArrayView2, Axis, Dim, OwnedRepr};
+use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
 use rayon::prelude::*;
 
 use crate::config;
@@ -36,33 +36,48 @@ pub fn dotsphere(
     Array::from_shape_vec((n, 3), data).unwrap()
 }
 
-/// 行遍历 求球的均等分点
 #[inline]
-pub fn dotsphere2(
-    n: usize,
-) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    let golden_ratio: f64 = (1f64 + 5f64.powf(0.5)) / 2f64;
-
-    let mut a = Array::<f64, _>::zeros((n, 3));
-
-    let mut i = 0;
-    a.map_axis_mut(Axis(1), |mut a| {
-        let theta = 2f64 * PI * (i as f64) / golden_ratio;
-        let phi: f64 = (1f64 - 2f64 * ((i as f64) + 0.5f64) / (n as f64)).acos();
-        a[0] = theta.cos() * phi.sin();
-        a[1] = theta.sin() * phi.sin();
-        a[2] = phi.cos();
-        i += 1;
-    });
-
-    a
-}
-
 fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
     match elements {
         Some(e) => config::get_vdw_radii(e[i]) + pr,
         None => pr,
     }
+}
+
+// 比较两个球心是不是太远, 一样的点 也认为是太远
+fn compare_two(a1: &ArrayView1<f64>, a2: &ArrayView1<f64>, r1: f64, r2: f64) -> bool {
+    let a = a1 - a2;
+    let r = a.mapv(|i| i * i).sum();
+
+    r < 1e-6 || r > (r1 + r2) * (r1 * r2)
+}
+
+// 球体相交的原子关系列表
+fn find_cross_ball(
+    coors: &ArrayView2<'_, f64>,
+    elements: Option<&Vec<&str>>,
+    v: &mut Vec<Vec<usize>>,
+    y_ptr: f64,
+) {
+    let n = coors.nrows();
+    let vv = Arc::new(Mutex::new(v));
+    (0..n).into_par_iter().for_each(|i| {
+        (i..n)
+            .into_iter()
+            .filter(|x| {
+                !compare_two(
+                    &coors.row(i),
+                    &coors.row(*x),
+                    get_vdw_radii(elements, y_ptr, i),
+                    get_vdw_radii(elements, y_ptr, *x),
+                )
+            })
+            .for_each(|x| {
+                let vvv = &mut vv.lock().unwrap();
+                &mut vvv[i].push(x);
+                &mut vvv[x].push(i);
+            });
+    });
 }
 
 /// 并行化 去除球体重叠部分, 效率优
@@ -72,10 +87,23 @@ pub fn sa_surface(
     n: Option<usize>,
     pr: Option<f64>,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
-    let c = if n.is_none() { 100 } else { n.unwrap() };
+    let count = if n.is_none() { 100 } else { n.unwrap() };
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
+    let y = dotsphere(count);
+
+    if count == 1 {
+        // 一个原子直接返回所有点
+        return concatenate![
+            Axis(1),
+            y.mapv(|b| b * get_vdw_radii(elements, y_ptr, 0)) + coors.row(0),
+            Array::<f64, _>::zeros((count, 1))
+        ];
+    }
+
+    let mut v = vec![Vec::<usize>::new(); coors.nrows()];
+    find_cross_ball(coors, elements, &mut v, y_ptr);
+
     let dd = Arc::new(Mutex::new(Vec::<f64>::new()));
-    let y = dotsphere(c);
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let r = get_vdw_radii(elements, y_ptr, i);
@@ -85,7 +113,7 @@ pub fn sa_surface(
 
         (0..b2.nrows()).into_par_iter().for_each(|i2| {
             let mut result = false;
-            for j in 0..coors.nrows() {
+            for &j in &v[i] {
                 let r = get_vdw_radii(elements, y_ptr, j).powi(2);
                 let b1 = coors.row(j);
                 let a1 = b2.row(i2);
@@ -112,12 +140,12 @@ pub fn sa_surface(
             let rows = (i - i % 4) / 4;
             *value = data[[rows, i % 4]];
         });
-        dd.clone().lock().unwrap().extend(v.iter());
+        dd.lock().unwrap().extend(v.iter());
     });
 
-    let ddd = dd.lock().unwrap();
+    let ddd = dd.lock().unwrap().to_owned();
 
-    Array::from_shape_vec((ddd.len() / 4, 4), ddd.to_owned()).unwrap()
+    Array::from_shape_vec((ddd.len() / 4, 4), ddd).unwrap()
 }
 
 #[cfg(test)]
@@ -125,19 +153,20 @@ mod tests {
     use log::info;
     use ndarray::array;
 
-    use crate::surface::{dotsphere, dotsphere2, sa_surface};
+    use crate::surface::{dotsphere, sa_surface};
 
     #[test]
     fn test_surface() {
         crate::config::init_config();
 
-        let a = array![[0., 0., 0.], [0., 0., 1.7]];
+        let a = array![[0., 0., 0.], [0., 0., 1.7], [0., 0., 10.7]];
 
-        let b = vec!["C", "O"];
+        let b = vec!["C", "O", "CD1"];
+        let n = 10000;
 
         info!("start ....");
-        let d = sa_surface(&a.view(), Some(&b), Some(100), Some(1.4));
-        info!("done ....{:?}", d);
+        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4));
+        info!("done ....{:?}", d.shape());
     }
 
     #[test]
@@ -155,11 +184,6 @@ mod tests {
         info!("start dotsphere");
         let a = dotsphere(n);
         info!("dotsphere done");
-
-        info!("start dotsphere2");
-        dotsphere2(n);
-        info!("dotsphere2 done");
-
         println!("{:?} ", a);
 
         assert!(true);

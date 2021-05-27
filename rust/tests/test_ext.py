@@ -146,10 +146,10 @@ def test_cal_electro():
 
 
 def test_sa_surface():
-    coor = np.array([[0, 0, 0], [0, 0, 1.7]])
+    coor = np.array([[0, 0, 0], [0, 0, 1.7], [0., 0., 10.7]])
     # elements = ['C', 'O']
-    elements = np.array(['C', 'O'])
+    elements = np.array(['C', 'O', "CD1"])
 
-    dots = sa_surface(coor, elements, 1000, 1.4)
+    dots = sa_surface(coor, elements, 5, 1.4)
     # dot2 = np.array(dots)
-    print("dots flags: ", dots.flags)
+    print("dots flags: ", dots.shape)
