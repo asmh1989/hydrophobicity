@@ -41,7 +41,7 @@ def gen_grid(coors, n=1, buffer=0):
     z_max = max(coors[:, 2])
     z_range = np.arange(int(z_min - buffer), int(z_max + buffer), n)
     xx, yy, zz = np.meshgrid(x_range, y_range, z_range)
-    # 将其用ravel展开成一维，放入dataframe中，并都标记为 1
+    # 将其用ravel展开成一维，放入dataframe中
     res = pd.DataFrame({'x': xx.ravel(), 'y': yy.ravel(), 'z': zz.ravel()})
     return res.values.astype('float64')
 
@@ -55,7 +55,7 @@ def sas_search_del(coors, elements, grids, pr=1.4):
     grids: 为该分子生成的格点，np.array
     pr: 伸长的半径，一般为水分子的半径 1.4
     '''
-    for index, coor in enumerate(coors):  # 循环格点
+    for index, coor in enumerate(coors):  # 循环原子
         r = vdw_radii[elements[index]] + pr
         d_ma = np.sum(np.square(coor - grids), axis=1)
         grids = grids[d_ma > np.square(r)]
@@ -66,7 +66,6 @@ def pas_search_for_water(grids, pas, n=40, pr=20):
     '''
     pas:protein accessible surface
     找到所有以 pas 为圆心，半径=pr 圆内所有的 格点
-    并将其标记为 0
     coors:分子的xyz坐标
     elements:分子的元素
     grids:经过sa_search_* 处理之后的格点
@@ -82,10 +81,9 @@ def pas_search_for_pocket(grids, pas, n=40, pr=20):
     '''
     pas:protein accessible surface
     找到所有以 pas 为圆心，半径=pr 圆内所有的 格点
-    并将其标记为 0
     grids:经过sa_search_* 处理之后的格点
     '''
-    for coor in pas[:, :-1]:  # 循环pas中的每个点
+    for coor in pas[:, :-3]:  # 循环pas中的每个点
         d_ma = np.sum(np.square(coor - grids), axis=1)
         grids = grids[d_ma > np.square(pr)]
     return grids
