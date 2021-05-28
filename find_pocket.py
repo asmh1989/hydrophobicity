@@ -86,7 +86,7 @@ def pas_search_for_pocket(grids, pas, n=40, pr=20):
     找到所有以 pas 为圆心，半径=pr 圆内所有的 格点
     grids:经过sa_search_* 处理之后的格点
     '''
-    for coor in pas[:, :-3]:  # 循环pas中的每个点
+    for coor in pas[:, :3]:  # 循环pas中的每个点
         d_ma = np.sum(np.square(coor - grids), axis=1)
         grids = grids[d_ma > np.square(pr)]
     return grids
