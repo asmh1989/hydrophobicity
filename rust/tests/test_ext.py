@@ -1,27 +1,6 @@
 import numpy as np
-from sz_py_ext import axpy, conj, mult, cal_electro, sa_surface
-
-
-def test_axpy():
-    x = np.array([1.0, 2.0, 3.0])
-    y = np.array([3.0, 3.0, 3.0])
-    z = axpy(3.0, x, y)
-    np.testing.assert_array_almost_equal(z, np.array([6.0, 9.0, 12.0]))
-    x = np.array([1.0, 2.0, 3.0, 4.0])
-    y = np.array([3.0, 3.0, 3.0, 3.0])
-    z = axpy(3.0, x, y)
-    np.testing.assert_array_almost_equal(z, np.array([6.0, 9.0, 12.0, 15.0]))
-
-
-def test_mult():
-    x = np.array([1.0, 2.0, 3.0])
-    mult(3.0, x)
-    np.testing.assert_array_almost_equal(x, np.array([3.0, 6.0, 9.0]))
-
-
-def test_conj():
-    x = np.array([1.0 + 2j, 2.0 + 3j, 3.0 + 4j])
-    np.testing.assert_array_almost_equal(conj(x), np.conj(x))
+import pytest
+from sz_py_ext import cal_electro, sa_surface, find_pocket
 
 
 grid = np.array([9., 68., 44.])
@@ -153,3 +132,133 @@ def test_sa_surface():
     dots = sa_surface(coor, elements, 5, 1.4)
     # dot2 = np.array(dots)
     print("dots flags: ", dots.shape)
+
+
+def test_find_pocket():
+    c = np.array([[5.80400e+00, 7.71280e+01, 3.75770e+01],
+                  [1.15920e+01, 8.69370e+01, 3.19960e+01],
+                  [3.04400e+00, 9.48200e+01, 5.90210e+01],
+                  [7.69800e+00, 1.04841e+02, 4.05320e+01],
+                  [1.57460e+01, 9.82030e+01, 5.00190e+01],
+                  [1.27360e+01, 1.04393e+02, 6.32570e+01],
+                  [1.98680e+01, 9.97520e+01, 6.71680e+01],
+                  [1.08790e+01, 9.28970e+01, 6.84030e+01],
+                  [2.43770e+01, 7.28520e+01, 4.72010e+01],
+                  [7.02600e+00, 7.53090e+01, 3.73980e+01],
+                  [1.25710e+01, 8.66980e+01, 3.00440e+01],
+                  [3.09400e+00, 9.30790e+01, 6.03660e+01],
+                  [5.77400e+00, 1.03860e+02, 4.01630e+01],
+                  [1.70960e+01, 9.74770e+01, 5.15840e+01],
+                  [1.45720e+01, 1.03200e+02, 6.34270e+01],
+                  [2.07020e+01, 1.01729e+02, 6.67280e+01],
+                  [9.60500e+00, 9.36190e+01, 7.00330e+01],
+                  [2.47620e+01, 7.29910e+01, 4.50380e+01],
+                  [9.03600e+00, 8.09360e+01, 3.48480e+01],
+                  [5.00000e-03, 9.38070e+01, 3.97600e+01],
+                  [4.39500e+00, 8.90320e+01, 3.82840e+01]])
+    e = np.array(["N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD",
+                  "OE1",
+                  "OE2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "OD1",
+                  "OD2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD",
+                  "OE1",
+                  "OE2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD1",
+                  "CD2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD1",
+                  "CD2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG1",
+                  "CG2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG2",
+                  "OG1",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG1",
+                  "CG2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD",
+                  "NE",
+                  "CZ",
+                  "NH1",
+                  "NH2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG",
+                  "CD",
+                  "NE",
+                  "CZ",
+                  "NH1",
+                  "NH2",
+                  "N",
+                  "CA",
+                  "C",
+                  "O",
+                  "CB",
+                  "CG"])
+    grid = find_pocket(c, e, 100, 20)
+    print('shape = ', grid.shape)

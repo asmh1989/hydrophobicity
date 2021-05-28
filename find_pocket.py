@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from core import vdw_radii
 from mol_surface import sa_surface
+from sz_py_ext import find_pocket as find_pocket_rust
 probe_radiis = {7.0: -993, 6.3: -930, 5.6: -761,
                 4.9: -464, 4.2: -195, 3.5: -64, 2.8: -19, 2.1: -5}
 
@@ -33,14 +34,16 @@ def gen_grid(coors, n=1, buffer=0):
     """
     x_min = min(coors[:, 0])
     x_max = max(coors[:, 0])
-    x_range = np.arange(int(x_min - buffer), int(x_max + buffer), n)
+    x_range = np.arange(int(x_min - buffer), int(x_max + buffer) + 1, n)
     y_min = min(coors[:, 1])
     y_max = max(coors[:, 1])
-    y_range = np.arange(int(y_min - buffer), int(y_max + buffer), n)
+    y_range = np.arange(int(y_min - buffer), int(y_max + buffer) + 1, n)
     z_min = min(coors[:, 2])
     z_max = max(coors[:, 2])
-    z_range = np.arange(int(z_min - buffer), int(z_max + buffer), n)
+
+    z_range = np.arange(int(z_min - buffer), int(z_max + buffer) + 1, n)
     xx, yy, zz = np.meshgrid(x_range, y_range, z_range)
+
     # 将其用ravel展开成一维，放入dataframe中
     res = pd.DataFrame({'x': xx.ravel(), 'y': yy.ravel(), 'z': zz.ravel()})
     return res.values.astype('float64')
@@ -96,7 +99,11 @@ def pocket_search(water_grids, pocket_grids):
     return water_grids
 
 
-def find_pocket(atoms_coors, elements, n=40, pas_r=20):
+def find_pocket(atoms_coors, elements, n=40, pas_r=20, enable_ext=True):
+
+    if enable_ext:
+        return find_pocket_rust(atoms_coors, elements, n, pas_r)
+
     pas = sa_surface(atoms_coors, elements, n=n, pr=pas_r)
     pocket_grids = gen_grid(atoms_coors, n=1)
     pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)

@@ -37,7 +37,7 @@ pub fn dotsphere(
 }
 
 #[inline]
-fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
+pub fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
     match elements {
         Some(e) => config::get_vdw_radii(e[i]) + pr,
         None => pr,
@@ -45,11 +45,11 @@ fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
 }
 
 // 比较两个球心是不是太远, 一样的点 也认为是太远
-fn compare_two(a1: &ArrayView1<f64>, a2: &ArrayView1<f64>, r1: f64, r2: f64) -> bool {
+pub fn compare_two(a1: &ArrayView1<f64>, a2: &ArrayView1<f64>, r1: f64, r2: f64) -> bool {
     let a = a1 - a2;
     let r = a.mapv(|i| i * i).sum();
 
-    r < 1e-6 || r > (r1 + r2) * (r1 * r2)
+    r < 1e-6 || r > (r1 + r2) * (r1 + r2)
 }
 
 // 球体相交的原子关系列表
@@ -167,6 +167,8 @@ mod tests {
         info!("start ....");
         let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4));
         info!("done ....{:?}", d.shape());
+
+        assert_eq!(22795, d.shape()[0]);
     }
 
     #[test]
