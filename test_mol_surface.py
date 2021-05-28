@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 pdb_6f6s = 'data/6FS6-mono_noe4z.pdb'
 pdb_4ey5 = 'data/4ey5_clean.pdb'
 
-pdb = pdb_6f6s
+pdb = pdb_4ey5
 
-n = 40
+n = 100
 c, e, r = read_pdb(pdb_6f6s)
 
 
@@ -52,13 +52,13 @@ def test_connolly_surface():
     to_xyz(dots, filename='test/test_connolly_surface.xyz')
 
 
-def test_find_pockets_rust(p=pdb):
+def test_find_pockets_rust(p=pdb, n=n):
     c, e, r = read_pdb(p)
     grids = find_pocket(c, e, n, 20, enable_ext=True)
     print("grids = ", grids.shape)
 
 
-def test_find_pockets_python(p=pdb):
+def test_find_pockets_python(p=pdb, n=n):
     c, e, r = read_pdb(p)
     grids = find_pocket(c, e, n,  20, enable_ext=False)
     print("grids = ", grids.shape)

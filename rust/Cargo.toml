@@ -27,3 +27,8 @@ version = "0.14.0"
 [dependencies.pyo3]
 version = "0.13"
 features = ["extension-module"]
+
+# [profile.release]
+# incremental = true
+# debug = 0 # Set this to 1 or 2 to get more useful backtraces in debugger.
+# opt-level = 'z'

@@ -5,7 +5,7 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::surface::{get_vdw_radii, sa_surface};
+use crate::{config::get_all_vdw, surface::sa_surface};
 
 ///
 /// 网格生成
@@ -71,17 +71,29 @@ fn select_point(
 
     let filer = Arc::new(Mutex::new(Vec::<usize>::new()));
 
+    let mm = get_all_vdw();
+
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
+        if let Some(e) = elements {
+            mm.get(e[i]).unwrap() + pr
+        } else {
+            pr
+        }
+    };
+
     (0..grid.nrows()).into_par_iter().for_each(|i| {
         let mut flags = true;
-        (0..coors.nrows()).into_iter().for_each(|j| {
+        let b1 = grid.row(i);
+
+        for j in 0..coors.nrows() {
             let r = get_vdw_radii(elements, y_ptr, j).powi(2);
-            let b1 = grid.row(i);
             let a1 = coors.row(j);
             let r1 = (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
             if r1 < r {
                 flags = false;
+                break;
             }
-        });
+        }
 
         if flags {
             &mut filer.lock().unwrap().push(i);

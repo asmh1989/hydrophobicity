@@ -1,3 +1,11 @@
+/*
+ * @Author: your name
+ * @Date: 2021-05-26 10:49:23
+ * @LastEditTime: 2021-05-28 17:17:04
+ * @LastEditors: Please set LastEditors
+ * @Description: In User Settings Edit
+ * @FilePath: /rust/src/config.rs
+ */
 use std::{collections::HashMap, sync::Mutex};
 
 use log::warn;
@@ -69,6 +77,10 @@ pub fn get_vdw_radii(key: &str) -> f64 {
         |p| *p,
     );
     f
+}
+
+pub fn get_all_vdw() -> HashMap<&'static str, f64> {
+    VDW_RADII.lock().unwrap().clone()
 }
 
 pub fn init_config() {
