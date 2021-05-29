@@ -104,6 +104,45 @@ fn select_point(
     d
 }
 
+fn select_point2(
+    coors: &ArrayView2<'_, f64>,
+    elements: Option<&Vec<&str>>,
+    grid: &ArrayView2<'_, f64>,
+    pr: Option<f64>,
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
+
+    let mm = get_all_vdw();
+
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
+        if let Some(e) = elements {
+            mm.get(e[i]).unwrap() + pr
+        } else {
+            pr
+        }
+    };
+
+    let mut tmp = grid.to_owned();
+
+    for i in 0..coors.nrows() {
+        let b1 = coors.row(i);
+        let r = get_vdw_radii(elements, y_ptr, i).powi(2);
+        let t = tmp.clone() - b1;
+
+        let dm = t
+            .mapv(|f| f * f)
+            .sum_axis(Axis(1))
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, f)| if *f > r { Some(i) } else { None })
+            .collect::<Vec<usize>>();
+
+        tmp = tmp.select(Axis(0), &dm);
+    }
+
+    tmp
+}
+
 pub fn find_pockets(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
@@ -120,7 +159,7 @@ pub fn find_pockets(
     log::info!("shape: {:?}", grid.shape());
 
     //去除原子集合内的格点
-    let grid1 = select_point(&coors.view(), elements, &grid.view(), Some(1.4));
+    let grid1 = select_point2(&coors.view(), elements, &grid.view(), Some(1.4));
     log::info!("shape: {:?}", grid1.shape());
 
     // 获得最后的pokcets
