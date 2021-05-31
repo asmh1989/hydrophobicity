@@ -45,7 +45,6 @@ def sa_surface(coors, elements, n=40, pr=1.4, enable_ext=True):
     pr:probe radaii"""
 
     if enable_ext == True:
-        print("use rust ", enable_ext)
         return sa_surface_rust(coors, elements, n, pr)
 
     dots = np.zeros((len(coors) * n, 4))

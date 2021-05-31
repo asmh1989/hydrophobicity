@@ -23,12 +23,15 @@ def test_sa_surface_rust(p=pdb):
     print('parse : ', p)
     c, e, r = read_pdb(p)
     dots = sa_surface(c, e, n=n, pr=1.4)
+    logger.info("dots = %s", dots.shape)
     to_xyz(dots, filename='test/{}-{}-cs_rust.xyz'.format(p.replace('/', '_'), n))
 
 
 def test_sa_surface_python(p=pdb):
     c, e, r = read_pdb(p)
     dots = sa_surface(c, e, n=n, pr=1.4, enable_ext=False)
+    logger.info("dots = %s", dots.shape)
+
     to_xyz(dots, filename='test/{}-{}-cs_rust.xyz'.format(p.replace('/', '_'), n))
 
 
@@ -53,9 +56,11 @@ def test_connolly_surface():
 
 
 def test_find_pockets_rust(p=pdb, n=n):
+    logger.info("start ... test_find_pockets_rust")
     c, e, r = read_pdb(p)
+    logger.info("start ... find_pocket")
     grids = find_pocket(c, e, n, 20, enable_ext=True)
-    print("grids = ", grids.shape)
+    logger.info("grids = %s", grids.shape)
 
 
 def test_find_pockets_python(p=pdb, n=n):

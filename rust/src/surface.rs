@@ -6,7 +6,7 @@ use std::{
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
 use rayon::prelude::*;
 
-use crate::config;
+use crate::config::{self, get_all_vdw};
 
 /// vec 并行计算 求球的均等分点 效率最高
 #[inline]
@@ -80,7 +80,9 @@ fn find_cross_ball(
     });
 }
 
+///
 /// 并行化 去除球体重叠部分, 效率优
+///
 pub fn sa_surface(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
@@ -91,29 +93,39 @@ pub fn sa_surface(
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
     let y = dotsphere(count);
 
-    if count == 1 {
-        // 一个原子直接返回所有点
-        return concatenate![
-            Axis(1),
-            y.mapv(|b| b * get_vdw_radii(elements, y_ptr, 0)) + coors.row(0),
-            Array::<f64, _>::zeros((count, 1))
-        ];
+    let mm = get_all_vdw();
+
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
+        if let Some(e) = elements {
+            mm.get(e[i]).unwrap() + pr
+        } else {
+            pr
+        }
+    };
+
+    let mut cross_v = Vec::new();
+    let need_cross = y_ptr < 4.;
+    if need_cross {
+        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
+        find_cross_ball(coors, elements, &mut cross_v, y_ptr);
     }
 
-    let mut v = vec![Vec::<usize>::new(); coors.nrows()];
-    find_cross_ball(coors, elements, &mut v, y_ptr);
-
-    let dd = Arc::new(Mutex::new(Vec::<f64>::new()));
+    let dd = Mutex::new(Vec::<f64>::new());
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let r = get_vdw_radii(elements, y_ptr, i);
         let b2 = y.mapv(|b| b * r) + coors.row(i);
 
-        let filer = Arc::new(Mutex::new(Vec::<usize>::new()));
+        let filer = Mutex::new(Vec::<usize>::new());
 
         (0..b2.nrows()).into_par_iter().for_each(|i2| {
             let mut result = false;
-            for &j in &v[i] {
+            for j in 0..coors.nrows() {
+                if need_cross {
+                    if !cross_v[i].contains(&j) {
+                        continue;
+                    }
+                }
                 let r = get_vdw_radii(elements, y_ptr, j).powi(2);
                 let b1 = coors.row(j);
                 let a1 = b2.row(i2);

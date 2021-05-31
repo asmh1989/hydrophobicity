@@ -84,7 +84,11 @@ pub fn get_all_vdw() -> HashMap<&'static str, f64> {
 }
 
 pub fn init_config() {
-    log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
+    let r = log4rs::init_file("config/log4rs.yaml", Default::default());
+
+    if r.is_err() {
+        let _ = log4rs::init_file("rust/config/log4rs.yaml", Default::default());
+    }
 }
 
 mod tests {
