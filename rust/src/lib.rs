@@ -42,10 +42,12 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         elements: Vec<&str>,
         n: usize,
         pr: f64,
+        index: bool,
     ) -> &'py PyArray2<f64> {
         // println!("elements = {:?}", elements);
         nparray_return!(
-            sa_surface(&coors.as_array(), Some(&elements), Some(n), Some(pr)).into_pyarray(py)
+            sa_surface(&coors.as_array(), Some(&elements), Some(n), Some(pr), index)
+                .into_pyarray(py)
         )
     }
 
@@ -55,8 +57,11 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         coors: PyReadonlyArray2<'_, f64>,
         n: usize,
         pr: f64,
+        index: bool,
     ) -> &'py PyArray2<f64> {
-        nparray_return!(sa_surface(&coors.as_array(), None, Some(n), Some(pr)).into_pyarray(py))
+        nparray_return!(
+            sa_surface(&coors.as_array(), None, Some(n), Some(pr), index).into_pyarray(py)
+        )
     }
 
     #[pyfn(m, "find_pocket")]
@@ -67,6 +72,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         n: usize,
         pr: f64,
     ) -> &'py PyArray2<f64> {
+        crate::config::init_config();
         nparray_return!(
             find_pockets(&coors.as_array(), Some(&elements), n, Some(pr)).into_pyarray(py)
         )

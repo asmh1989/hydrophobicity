@@ -37,7 +37,7 @@ def dotsphere(n=100):
     return(np.array([x, y, z]).T)
 
 
-def sa_surface(coors, elements, n=40, pr=1.4, enable_ext=True):
+def sa_surface(coors, elements, n=40, pr=1.4, enable_ext=True, index=True):
     """ 生solvent accessible ,返回list，list的index为原子的序号
     coors: 体系的xyz坐标，shape：(m * 3)
     elements: 元素，shape：（m * 1))
@@ -45,8 +45,7 @@ def sa_surface(coors, elements, n=40, pr=1.4, enable_ext=True):
     pr:probe radaii"""
 
     if enable_ext == True:
-        print("use rust ", enable_ext)
-        return sa_surface_rust(coors, elements, n, pr)
+        return sa_surface_rust(coors, elements, n, pr, index)
 
     dots = np.zeros((len(coors) * n, 4))
 
@@ -69,9 +68,9 @@ def sa_surface(coors, elements, n=40, pr=1.4, enable_ext=True):
     return(dots)
 
 
-def sa_surface_no_ele(coors, n=40, pr=1.4, enable_ext=True):
+def sa_surface_no_ele(coors, n=40, pr=1.4, enable_ext=True, index=True):
     if enable_ext:
-        return sa_surface_no_ele_rust(coors, n, pr)
+        return sa_surface_no_ele_rust(coors, n, pr, index)
     dots = np.zeros((len(coors) * n, 4))
 
     for i in range(coors.shape[0]):

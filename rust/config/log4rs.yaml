@@ -16,4 +16,4 @@ root:
   level: info
   appenders:
     - stdout
-    - file
+    # - file

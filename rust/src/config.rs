@@ -68,7 +68,7 @@ const VDW_RADII: Lazy<Mutex<HashMap<&str, f64>>> = Lazy::new(|| {
     Mutex::new(m)
 });
 
-pub fn get_vdw_radii(key: &str) -> f64 {
+pub fn get_radii(key: &str) -> f64 {
     let f = VDW_RADII.lock().unwrap().get(key).map_or_else(
         || {
             warn!("key : {} not found vdw radii map", &key);
@@ -79,12 +79,23 @@ pub fn get_vdw_radii(key: &str) -> f64 {
     f
 }
 
+pub fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
+    match elements {
+        Some(e) => get_radii(e[i]) + pr,
+        None => pr,
+    }
+}
+
 pub fn get_all_vdw() -> HashMap<&'static str, f64> {
     VDW_RADII.lock().unwrap().clone()
 }
 
 pub fn init_config() {
-    log4rs::init_file("config/log4rs.yaml", Default::default()).unwrap();
+    let r = log4rs::init_file("config/log4rs.yaml", Default::default());
+
+    if r.is_err() {
+        let _ = log4rs::init_file("rust/config/log4rs.yaml", Default::default());
+    }
 }
 
 mod tests {
@@ -92,8 +103,8 @@ mod tests {
     #[test]
     fn test_vdw() {
         super::init_config();
-        assert_eq!(super::get_vdw_radii("C"), 1.7f64);
-        assert_ne!(super::get_vdw_radii("O"), 1.7f64);
-        assert_eq!(super::get_vdw_radii("1"), 0.);
+        assert_eq!(super::get_radii("C"), 1.7f64);
+        assert_ne!(super::get_radii("O"), 1.7f64);
+        assert_eq!(super::get_radii("1"), 0.);
     }
 }
