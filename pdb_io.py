@@ -53,11 +53,11 @@ def group_bfacter(data, sep):
     return df
 
 
-def to_xyz(data, filename='test.xyz'):
+def to_xyz(data, ele='H', filename='test.xyz'):
 
     mkdir_by_file(filename)
 
     t = pd.DataFrame(data)
-    t.insert(0, 'atom', 'H')
+    t.insert(0, 'atom', ele)
     t.to_csv(filename, header=None, index=None, sep=' ')
     print('Done')
