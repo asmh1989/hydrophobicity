@@ -128,9 +128,7 @@ def find_water(atoms_coors, elements, n=40, pas_r=20):
 def label_grids(grids, pas, pr=20):
     '''
     pas:protein accessible surface
-    找到所有以 pas 为圆心，半径=pr 圆内所有的 格点
-    并将其标记为 0
-    grids:经过sa_search_* 处理之后的格点
+
     '''
     for coor in pas[:, :3]:  # 循环pas中的每个点
         d_ma = np.sum(np.square(coor - grids[:, :3]), axis=1)
