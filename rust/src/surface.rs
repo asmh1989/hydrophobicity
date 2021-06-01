@@ -6,7 +6,7 @@ use std::{
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
 use rayon::prelude::*;
 
-use crate::config::{self, get_all_vdw};
+use crate::config::{get_all_vdw, get_vdw_radii};
 
 /// vec 并行计算 求球的均等分点 效率最高
 #[inline]
@@ -34,14 +34,6 @@ pub fn dotsphere(
     });
 
     Array::from_shape_vec((n, 3), data).unwrap()
-}
-
-#[inline]
-pub fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
-    match elements {
-        Some(e) => config::get_vdw_radii(e[i]) + pr,
-        None => pr,
-    }
 }
 
 // 比较两个球心是不是太远, 一样的点 也认为是太远
@@ -81,17 +73,35 @@ fn find_cross_ball(
 }
 
 ///
-/// 并行化 去除球体重叠部分, 效率优
+/// 去除球体重叠部分
+/// * `coors` : 原子坐标集合
+/// * `elements` : 原子名称列表
+/// * `n` : 球均分点数
+/// * `pr` : 补充半径
+/// * `index`: 返回矩阵是否包含index
 ///
 pub fn sa_surface(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
     n: Option<usize>,
     pr: Option<f64>,
+    index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
     let count = if n.is_none() { 100 } else { n.unwrap() };
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
     let y = dotsphere(count);
+
+    let mut cross_v = Vec::new();
+    let need_cross = y_ptr < 4.;
+    if need_cross {
+        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
+        find_cross_ball(coors, elements, &mut cross_v, y_ptr);
+    }
+
+    let col = if index { 4 } else { 3 };
+
+    let dd = Mutex::new(Vec::<f64>::new());
+    let row = coors.nrows();
 
     let mm = get_all_vdw();
 
@@ -103,32 +113,28 @@ pub fn sa_surface(
         }
     };
 
-    let mut cross_v = Vec::new();
-    let need_cross = y_ptr < 4.;
-    if need_cross {
-        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
-        find_cross_ball(coors, elements, &mut cross_v, y_ptr);
-    }
-
-    let dd = Mutex::new(Vec::<f64>::new());
+    let mut radis_v = vec![0.; row];
+    radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
+        *v = get_vdw_radii(elements, y_ptr, i);
+    });
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
-        let r = get_vdw_radii(elements, y_ptr, i);
+        let r = (&radis_v).get(i).unwrap();
         let b2 = y.mapv(|b| b * r) + coors.row(i);
 
         let filer = Mutex::new(Vec::<usize>::new());
 
         (0..b2.nrows()).into_par_iter().for_each(|i2| {
             let mut result = false;
+            let a1 = b2.row(i2);
             for j in 0..coors.nrows() {
                 if need_cross {
                     if !cross_v[i].contains(&j) {
                         continue;
                     }
                 }
-                let r = get_vdw_radii(elements, y_ptr, j).powi(2);
+                let r = (&radis_v).get(j).unwrap().powi(2);
                 let b1 = coors.row(j);
-                let a1 = b2.row(i2);
                 let r1 =
                     (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
                 if r1 < r && r - r1 > 1e-6 {
@@ -143,21 +149,25 @@ pub fn sa_surface(
         });
 
         let u = b2.select(Axis(0), &filer.lock().unwrap());
-        let four = Array::<f64, _>::zeros((u.nrows(), 1)).mapv(|_| i as f64);
 
-        let mut v = vec![0.; u.nrows() * 4];
-        let data = concatenate![Axis(1), u, four];
+        let mut v = vec![0.; u.nrows() * col];
+        let data = if index {
+            let four = Array::<f64, _>::zeros((u.nrows(), 1)).mapv(|_| i as f64);
+            concatenate![Axis(1), u, four]
+        } else {
+            u
+        };
 
         v.par_iter_mut().enumerate().for_each(|(i, value)| {
-            let rows = (i - i % 4) / 4;
-            *value = data[[rows, i % 4]];
+            let rows = (i - i % col) / col;
+            *value = data[[rows, i % col]];
         });
         dd.lock().unwrap().extend(v.iter());
     });
 
     let ddd = dd.lock().unwrap().to_owned();
 
-    Array::from_shape_vec((ddd.len() / 4, 4), ddd).unwrap()
+    Array::from_shape_vec((ddd.len() / col, col), ddd).unwrap()
 }
 
 #[cfg(test)]
@@ -177,7 +187,7 @@ mod tests {
         let n = 10000;
 
         info!("start ....");
-        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4));
+        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
         info!("done ....{:?}", d.shape());
 
         assert_eq!(22795, d.shape()[0]);

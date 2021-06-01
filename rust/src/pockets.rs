@@ -9,7 +9,10 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::{config::get_all_vdw, surface::sa_surface};
+use crate::{
+    config::{get_all_vdw, get_vdw_radii},
+    surface::sa_surface,
+};
 
 ///
 /// 网格生成
@@ -121,21 +124,11 @@ fn select_point2(
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
-    let mm = get_all_vdw();
-
-    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
-        if let Some(e) = elements {
-            mm.get(e[i]).unwrap() + pr
-        } else {
-            pr
-        }
-    };
-
     let tmp = grid.to_owned();
 
     let row = grid.nrows();
 
-    let filer = Mutex::new(HashSet::<usize>::new());
+    let filer = Mutex::new(HashSet::<usize>::with_capacity(row / 4));
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let b1 = coors.row(i);
@@ -158,29 +151,20 @@ fn select_point2(
             .into_iter()
             .enumerate()
             .for_each(|(i, f)| {
-                if *f < r * r + 1e-6 {
+                if *f < r * r {
                     filer.lock().unwrap().insert(start + i);
                 }
             });
-
-        // log::info!(
-        //     "start = {:?}, shape = {:?}  {:?}",
-        //     (start, end),
-        //     tmp_s.shape(),
-        //     (b1[0], b1[1], b1[2], r),
-        // );
-
-        // tmp = tmp.select(Axis(0), &dm);
     });
 
     let d = filer.lock().unwrap().to_owned();
 
-    let dd = (0..row)
-        .into_iter()
+    let d = (0..row)
+        .into_par_iter()
         .filter_map(|f| if d.contains(&f) { None } else { Some(f) })
         .collect::<Vec<usize>>();
 
-    tmp.select(Axis(0), &dd)
+    tmp.select(Axis(0), &d)
 }
 
 pub fn find_pockets(
@@ -191,7 +175,7 @@ pub fn find_pockets(
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let mut xyz = [0.; 9];
     // 辅助sa surface
-    let dot = sa_surface(&coors.view(), elements, Some(n), pr);
+    let dot = sa_surface(&coors.view(), elements, Some(n), pr, false);
 
     log::info!("shape: {:?}", dot.shape());
 
@@ -342,8 +326,6 @@ mod tests {
         info!("start find pockets");
 
         let grid = find_pockets(&a.view(), Some(&b), n, Some(20.));
-
-        info!("gen_grid3: {:?}", grid.shape());
 
         assert_eq!(23831, grid.shape()[0]);
     }
