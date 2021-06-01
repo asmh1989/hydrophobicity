@@ -1,7 +1,6 @@
 use std::{
     cmp::min,
     collections::HashSet,
-    f64::consts::PI,
     sync::{Arc, Mutex},
 };
 
@@ -115,7 +114,7 @@ fn select_point2(
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
-    let tmp = grid.to_owned();
+    let tmp = grid;
 
     let row = grid.nrows();
 
@@ -133,25 +132,53 @@ fn select_point2(
         let (c1, c2) = (xyz[5] * xyz[8], xyz[8]);
         let start = (x1 * c1 + y1 * c2 + z1) as usize;
         let end = min(row, (x2 * c1 + y2 * c2 + z2) as usize);
-        let tmp_s = tmp.slice(s![start..end, ..]);
 
-        let t = &tmp_s - &b1;
+        let (xmin, ymin, zmin) = (x1.floor() as i32, y1.floor() as i32, z1.floor() as i32);
+        let (xmax, ymax, zmax) = (x2.ceil() as i32, y2.ceil() as i32, z2.ceil() as i32);
+
+        let p_len = (xmax - xmin) * (ymax - ymin) * (zmax - zmin);
+
+        // info!(
+        //     "center({:?}), r({:.3}), len({:?}), start({:?}), range({:?}, {:?}, {:?})",
+        //     (b1[0], b1[1], b1[2]),
+        //     r,
+        //     p_len,
+        //     (start, end, tmp.nrows()),
+        //     (xmin, xmax),
+        //     (ymin, ymax),
+        //     (zmin, zmax)
+        // );
 
         // 精确计算球体中的点数
-        let mut cache = Vec::<usize>::with_capacity((8. * r.floor().powi(3) * 4. / PI) as usize);
+        let cache = Mutex::new(Vec::<usize>::with_capacity(p_len as usize));
 
-        t.mapv(|f| f * f)
-            .sum_axis(Axis(1))
-            .into_iter()
-            .enumerate()
-            .for_each(|(i, f)| {
-                if *f < r * r {
-                    cache.push(start + i);
+        // 遍历原子所在的立方体区域
+        (xmin..xmax).into_par_iter().for_each(|x| {
+            for y in ymin..ymax {
+                let start =
+                    std::cmp::max(start, (x * (c1 as i32) + y * (c2 as i32) + zmin) as usize);
+                let end = min(end, (x * (c1 as i32) + y * (c2 as i32) + zmax) as usize);
+                if start > end - 1 {
+                    continue;
                 }
-            });
+                let tmp_s = tmp.slice(s![start..end, ..]);
 
+                let t = &tmp_s - &b1;
+
+                t.mapv(|f| f * f)
+                    .sum_axis(Axis(1))
+                    .into_iter()
+                    .enumerate()
+                    .for_each(|(i, f)| {
+                        if *f < r * r {
+                            let m = &mut cache.lock().unwrap();
+                            m.push(start + i);
+                        }
+                    });
+            }
+        });
         let n = &mut filer.lock().unwrap();
-        n.extend(&cache);
+        n.extend(cache.lock().unwrap().to_owned());
     });
 
     let d = filer.lock().unwrap().to_owned();

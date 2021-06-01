@@ -66,6 +66,17 @@ def test_find_pockets_rust():
     assert(grids.shape[0] == 14389)
 
 
+def test_find_pockets_rust2():
+    n = 100
+    p = pdb_6f6s
+    logger.info("start ... test_find_pockets_rust")
+    c, e, r = read_pdb(p)
+    logger.info("start ... find_pocket")
+    grids = find_pocket(c, e, n, 20, enable_ext=True)
+    logger.info("grids = %s", grids.shape)
+    assert(grids.shape[0] == 6460)
+
+
 def test_find_pockets_python():
     n = 100
     p = pdb_4ey5
@@ -73,6 +84,15 @@ def test_find_pockets_python():
     grids = find_pocket(c, e, n,  20, enable_ext=False)
     print("grids = ", grids.shape)
     assert(grids.shape[0] == 14389)
+
+
+def test_find_pockets_python2():
+    n = 100
+    p = pdb_6f6s
+    c, e, r = read_pdb(p)
+    grids = find_pocket(c, e, n,  20, enable_ext=False)
+    print("grids = ", grids.shape)
+    assert(grids.shape[0] == 6460)
 
 
 def test_custom_data():
