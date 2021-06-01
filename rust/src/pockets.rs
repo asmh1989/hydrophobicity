@@ -1,6 +1,7 @@
 use std::{
     cmp::min,
     collections::HashSet,
+    f64::consts::PI,
     sync::{Arc, Mutex},
 };
 
@@ -9,10 +10,7 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::{
-    config::{get_all_vdw, get_vdw_radii},
-    surface::sa_surface,
-};
+use crate::{config::get_all_vdw, surface::sa_surface_core};
 
 ///
 /// 网格生成
@@ -74,7 +72,7 @@ fn gen_grid(
 /// 返回过滤后的`grid`
 fn select_point(
     coors: &ArrayView2<'_, f64>,
-    elements: Option<&Vec<&str>>,
+    elements: Option<&Vec<f64>>,
     grid: &ArrayView2<'_, f64>,
     pr: Option<f64>,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
@@ -82,22 +80,15 @@ fn select_point(
 
     let filer = Arc::new(Mutex::new(Vec::<usize>::new()));
 
-    let mm = get_all_vdw();
-
-    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
-        if let Some(e) = elements {
-            mm.get(e[i]).unwrap() + pr
-        } else {
-            pr
-        }
-    };
-
     (0..grid.nrows()).into_par_iter().for_each(|i| {
         let mut flags = true;
         let b1 = grid.row(i);
 
         for j in 0..coors.nrows() {
-            let r = get_vdw_radii(elements, y_ptr, j).powi(2);
+            let r = match elements {
+                Some(e) => (e[j] + y_ptr).powi(2),
+                None => y_ptr.powi(2),
+            };
             let a1 = coors.row(j);
             let r1 = (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
             if r1 < r {
@@ -117,7 +108,7 @@ fn select_point(
 
 fn select_point2(
     coors: &ArrayView2<'_, f64>,
-    elements: Option<&Vec<&str>>,
+    elements: &Vec<f64>,
     grid: &ArrayView2<'_, f64>,
     pr: Option<f64>,
     xyz: &[f64],
@@ -128,23 +119,26 @@ fn select_point2(
 
     let row = grid.nrows();
 
-    let filer = Mutex::new(HashSet::<usize>::with_capacity(row / 4));
+    let filer = Mutex::new(HashSet::<usize>::with_capacity(row / 2));
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let b1 = coors.row(i);
-        let r = get_vdw_radii(elements, y_ptr, i);
+        let r = elements[i] + y_ptr;
 
+        // 立方体左上角最小的点
         let (x1, y1, z1) = (b1[0] - r - xyz[0], b1[1] - r - xyz[3], b1[2] - r - xyz[6]);
-
-        let (c1, c2) = (xyz[5] * xyz[8], xyz[8]);
-
-        let start = (x1 * c1 + y1 * c2 + z1) as usize;
+        // 立方体右下角最大的点
         let (x2, y2, z2) = (b1[0] + r - xyz[0], b1[1] + r - xyz[3], b1[2] + r - xyz[6]);
 
+        let (c1, c2) = (xyz[5] * xyz[8], xyz[8]);
+        let start = (x1 * c1 + y1 * c2 + z1) as usize;
         let end = min(row, (x2 * c1 + y2 * c2 + z2) as usize);
         let tmp_s = tmp.slice(s![start..end, ..]);
 
-        let t = tmp_s.to_owned() - b1;
+        let t = &tmp_s - &b1;
+
+        // 精确计算球体中的点数
+        let mut cache = Vec::<usize>::with_capacity((8. * r.floor().powi(3) * 4. / PI) as usize);
 
         t.mapv(|f| f * f)
             .sum_axis(Axis(1))
@@ -152,9 +146,12 @@ fn select_point2(
             .enumerate()
             .for_each(|(i, f)| {
                 if *f < r * r {
-                    filer.lock().unwrap().insert(start + i);
+                    cache.push(start + i);
                 }
             });
+
+        let n = &mut filer.lock().unwrap();
+        n.extend(&cache);
     });
 
     let d = filer.lock().unwrap().to_owned();
@@ -174,8 +171,24 @@ pub fn find_pockets(
     pr: Option<f64>,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let mut xyz = [0.; 9];
+
+    // 求得原子半径集合缓存, 下面多个方法需要使用
+    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
+    let mm = get_all_vdw();
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, i: usize| {
+        if let Some(e) = elements {
+            mm.get(e[i]).unwrap() + 0.
+        } else {
+            0.
+        }
+    };
+    let mut radis_v = vec![0.; coors.nrows()];
+    radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
+        *v = get_vdw_radii(elements, i);
+    });
+
     // 辅助sa surface
-    let dot = sa_surface(&coors.view(), elements, Some(n), pr, false);
+    let dot = sa_surface_core(&coors.view(), &radis_v, n, y_ptr, false);
 
     log::info!("shape: {:?}", dot.shape());
 
@@ -185,7 +198,7 @@ pub fn find_pockets(
     log::info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
 
     //去除原子集合内的格点
-    let grid1 = select_point2(&coors.view(), elements, &grid.view(), Some(1.4), &xyz);
+    let grid1 = select_point2(&coors.view(), &radis_v, &grid.view(), Some(1.4), &xyz);
     log::info!("1111 shape: {:?}", grid1.shape());
 
     // 获得最后的pokcets

@@ -6,7 +6,7 @@ use std::{
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
 use rayon::prelude::*;
 
-use crate::config::{get_all_vdw, get_vdw_radii};
+use crate::config::get_all_vdw;
 
 /// vec 并行计算 求球的均等分点 效率最高
 #[inline]
@@ -47,9 +47,9 @@ pub fn compare_two(a1: &ArrayView1<f64>, a2: &ArrayView1<f64>, r1: f64, r2: f64)
 // 球体相交的原子关系列表
 fn find_cross_ball(
     coors: &ArrayView2<'_, f64>,
-    elements: Option<&Vec<&str>>,
+    elements: &Vec<f64>,
     v: &mut Vec<Vec<usize>>,
-    y_ptr: f64,
+    pr: f64,
 ) {
     let n = coors.nrows();
     let vv = Arc::new(Mutex::new(v));
@@ -60,8 +60,8 @@ fn find_cross_ball(
                 !compare_two(
                     &coors.row(i),
                     &coors.row(*x),
-                    get_vdw_radii(elements, y_ptr, i),
-                    get_vdw_radii(elements, y_ptr, *x),
+                    elements[i] + pr,
+                    elements[*x] + pr,
                 )
             })
             .for_each(|x| {
@@ -89,37 +89,49 @@ pub fn sa_surface(
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
     let count = if n.is_none() { 100 } else { n.unwrap() };
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-    let y = dotsphere(count);
 
-    let mut cross_v = Vec::new();
-    let need_cross = y_ptr < 4.;
-    if need_cross {
-        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
-        find_cross_ball(coors, elements, &mut cross_v, y_ptr);
-    }
-
-    let col = if index { 4 } else { 3 };
-
-    let dd = Mutex::new(Vec::<f64>::new());
     let row = coors.nrows();
 
     let mm = get_all_vdw();
 
-    let get_vdw_radii = move |elements: Option<&Vec<&str>>, pr: f64, i: usize| {
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, i: usize| {
         if let Some(e) = elements {
-            mm.get(e[i]).unwrap() + pr
+            mm.get(e[i]).unwrap() + 0.
         } else {
-            pr
+            0.
         }
     };
 
     let mut radis_v = vec![0.; row];
     radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
-        *v = get_vdw_radii(elements, y_ptr, i);
+        *v = get_vdw_radii(elements, i);
     });
 
+    sa_surface_core(coors, &radis_v, count, y_ptr, index)
+}
+
+pub fn sa_surface_core(
+    coors: &ArrayView2<'_, f64>,
+    elements: &Vec<f64>,
+    count: usize,
+    pr: f64,
+    index: bool,
+) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
+    let y = dotsphere(count);
+
+    let mut cross_v = Vec::new();
+    let need_cross = pr < 4.;
+    if need_cross {
+        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
+        find_cross_ball(coors, elements, &mut cross_v, pr);
+    }
+
+    let col = if index { 4 } else { 3 };
+
+    let dd = Mutex::new(Vec::<f64>::new());
+
     (0..coors.nrows()).into_par_iter().for_each(|i| {
-        let r = (&radis_v).get(i).unwrap();
+        let r = elements[i] + pr;
         let b2 = y.mapv(|b| b * r) + coors.row(i);
 
         let filer = Mutex::new(Vec::<usize>::new());
@@ -133,7 +145,7 @@ pub fn sa_surface(
                         continue;
                     }
                 }
-                let r = (&radis_v).get(j).unwrap().powi(2);
+                let r = (elements[j] + pr).powi(2);
                 let b1 = coors.row(j);
                 let r1 =
                     (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
