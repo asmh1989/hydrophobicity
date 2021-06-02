@@ -99,41 +99,32 @@ pub fn sa_surface_core(
     pr: Option<f64>,
     index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
-    let y = dotsphere(n);
+    let ball = dotsphere(n);
 
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-
-    let mut cross_v = Vec::new();
-    let need_cross = y_ptr < 2.;
-    log::info!("need_cross = {}", need_cross);
-    if need_cross {
-        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
-        find_cross_ball(coors, elements, &mut cross_v, y_ptr);
-    }
 
     let col = if index { 4 } else { 3 };
 
     let dd = Mutex::new(Vec::<f64>::new());
 
+    let ele = elements
+        .into_par_iter()
+        .map(|f| (*f + y_ptr).powi(2))
+        .collect::<Vec<f64>>();
+
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let r = elements[i] + y_ptr;
-        let b2 = y.mapv(|b| b * r) + coors.row(i);
+        let ball2 = ball.mapv(|b| b * r) + coors.row(i);
 
-        let filer = Mutex::new(Vec::<usize>::new());
+        let filer = Mutex::new(Vec::<usize>::with_capacity(n / 4));
 
-        (0..b2.nrows()).into_par_iter().for_each(|i2| {
+        (0..n).into_par_iter().for_each(|j| {
             let mut result = false;
-            let a1 = b2.row(i2);
-            for j in 0..coors.nrows() {
-                if need_cross {
-                    if !cross_v[i].contains(&j) {
-                        continue;
-                    }
-                }
-                let r = (elements[j] + y_ptr).powi(2);
-                let b1 = coors.row(j);
-                let r1 =
-                    (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
+            let b = ball2.row(j);
+            for c in 0..coors.nrows() {
+                let r = ele[c];
+                let cc = coors.row(c);
+                let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
                 if r1 < r && r - r1 > 1e-6 {
                     result = true;
                     break;
@@ -141,13 +132,12 @@ pub fn sa_surface_core(
             }
 
             if result == false {
-                filer.lock().unwrap().push(i2);
+                filer.lock().unwrap().push(j);
             }
         });
 
-        let u = b2.select(Axis(0), &filer.lock().unwrap());
+        let u = ball2.select(Axis(0), &filer.lock().unwrap());
 
-        let mut v = vec![0.; u.nrows() * col];
         let data = if index {
             let four = Array::<f64, _>::zeros((u.nrows(), 1)).mapv(|_| i as f64);
             concatenate![Axis(1), u, four]
@@ -155,11 +145,7 @@ pub fn sa_surface_core(
             u
         };
 
-        v.par_iter_mut().enumerate().for_each(|(i, value)| {
-            let rows = (i - i % col) / col;
-            *value = data[[rows, i % col]];
-        });
-        dd.lock().unwrap().extend(v.iter());
+        dd.lock().unwrap().extend(data.iter().map(|f| *f));
     });
 
     let ddd = dd.lock().unwrap().to_owned();
