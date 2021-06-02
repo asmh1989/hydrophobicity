@@ -5,7 +5,11 @@ use numpy::{
 };
 use pyo3::prelude::{pymodule, PyModule, PyResult, Python};
 
-use crate::{electrostatic::cal_electro, pockets::find_pockets, surface::sa_surface};
+use crate::{
+    electrostatic::cal_electro,
+    pockets::{find_layer, find_pockets},
+    surface::sa_surface,
+};
 
 mod config;
 mod electrostatic;
@@ -72,10 +76,22 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         n: usize,
         pr: f64,
     ) -> &'py PyArray2<f64> {
-        crate::config::init_config();
+        // crate::config::init_config();
         nparray_return!(
             find_pockets(&coors.as_array(), Some(&elements), n, Some(pr)).into_pyarray(py)
         )
+    }
+
+    #[pyfn(m, "find_layer")]
+    fn find_layer_py<'py>(
+        py: Python<'py>,
+        coors: PyReadonlyArray2<'_, f64>,
+        elements: Vec<&str>,
+        n: usize,
+        pr: f64,
+    ) -> &'py PyArray2<f64> {
+        // crate::config::init_config();
+        nparray_return!(find_layer(&coors.as_array(), Some(&elements), n, Some(pr)).into_pyarray(py))
     }
 
     Ok(())

@@ -1,10 +1,7 @@
-use std::{
-    cmp::min,
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
+use std::{cmp::min, collections::HashSet, sync::Mutex};
 
-use ndarray::{s, Array, ArrayView2, Axis};
+use log::info;
+use ndarray::{concatenate, s, Array, ArrayView2, Axis};
 use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
@@ -77,7 +74,7 @@ fn select_point(
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
-    let filer = Arc::new(Mutex::new(Vec::<usize>::new()));
+    let filer = Mutex::new(Vec::<usize>::with_capacity(grid.nrows() / 4));
 
     (0..grid.nrows()).into_par_iter().for_each(|i| {
         let mut flags = true;
@@ -215,22 +212,68 @@ pub fn find_pockets_core(
     // 辅助sa surface
     let dot = sa_surface_core(&coors.view(), &radis_v, n, pr, false);
 
-    log::info!("shape: {:?}", dot.shape());
+    info!("shape: {:?}", dot.shape());
 
     // 生成网格
     let grid = gen_grid(&coors.view(), 1, 0., &mut xyz);
 
-    log::info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
+    info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
 
     //去除原子集合内的格点
     let grid1 = select_point2(&coors.view(), &radis_v, &grid.view(), Some(1.4), &xyz);
-    log::info!("1111 shape: {:?}", grid1.shape());
+    info!("1111 shape: {:?}", grid1.shape());
 
     // 获得最后的pokcets
     let grid1 = select_point(&dot.view(), None, &grid1.view(), pr);
-    log::info!("2222 shape: {:?}", grid1.shape());
+    info!("2222 shape: {:?}", grid1.shape());
     grid1
 }
+
+pub fn label_from_grid(
+    grid: &ArrayView2<'_, f64>,
+    coors: &ArrayView2<'_, f64>,
+    label: f64,
+    vec: &mut Vec<f64>,
+    pr: f64,
+) {
+    let tmp = vec.clone();
+
+    let filer = Mutex::new(vec);
+    let r = pr.powi(2);
+
+    (0..grid.nrows()).into_par_iter().for_each(|i| {
+        if tmp[i] != 0. {
+            return;
+        }
+        let mut flags = false;
+        let b1 = grid.row(i);
+
+        for j in 0..coors.nrows() {
+            let a1 = coors.row(j);
+            let r1 = (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
+            if r1 < r {
+                flags = true;
+                break;
+            }
+        }
+
+        if flags {
+            let n = &mut filer.lock().unwrap();
+            n[i] = label;
+        }
+    });
+}
+
+const PROBE_RADIIS: [(f64, i32); 8] = [
+    (7.0, -993),
+    (6.3, -930),
+    (5.6, -761),
+    (4.9, -464),
+    (4.2, -195),
+    (3.5, -64),
+    (2.8, -19),
+    (2.1, -5),
+];
 
 ///
 /// 给找到的pockets分层
@@ -247,15 +290,26 @@ pub fn find_layer(
 
     let grid = find_pockets_core(coors, &radis_v, n, pr);
 
-    grid
+    let rows = grid.nrows();
+
+    let mut vec = vec![0.; rows];
+
+    PROBE_RADIIS.iter().for_each(|f| {
+        info!("start sa_surface_core pr={}", f.0);
+        let dots = sa_surface_core(coors, &radis_v, n, Some(f.0), false);
+        info!("end sa_surface_core pr={}", f.0);
+        label_from_grid(&grid.view(), &dots.view(), f.1 as f64, &mut vec, f.0);
+    });
+
+    let index = Array::from_shape_vec((rows, 1), vec).unwrap();
+
+    concatenate![Axis(1), grid, index]
 }
 
 #[cfg(test)]
 mod tests {
     use log::info;
     use ndarray::array;
-
-    use crate::pockets::find_pockets;
 
     #[test]
     fn test_grid() {
@@ -379,11 +433,17 @@ mod tests {
 
         let n = 100;
 
-        info!("start find pockets");
+        // info!("start find pockets");
 
-        let grid = find_pockets(&a.view(), Some(&b), n, Some(20.));
+        // let grid = find_pockets(&a.view(), Some(&b), n, Some(20.));
 
-        assert_eq!(23831, grid.shape()[0]);
+        // assert_eq!(23831, grid.shape()[0]);
+
+        info!("start find layer");
+
+        let grid = super::find_layer(&a.view(), Some(&b), n, Some(20.));
+
+        info!("layer = {:?}", grid);
     }
 
     #[test]

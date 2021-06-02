@@ -1,7 +1,4 @@
-use std::{
-    f64::consts::PI,
-    sync::{Arc, Mutex},
-};
+use std::{f64::consts::PI, sync::Mutex};
 
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
 use rayon::prelude::*;
@@ -52,7 +49,7 @@ fn find_cross_ball(
     pr: f64,
 ) {
     let n = coors.nrows();
-    let vv = Arc::new(Mutex::new(v));
+    let vv = Mutex::new(v);
     (0..n).into_par_iter().for_each(|i| {
         (i..n)
             .into_iter()
@@ -98,16 +95,17 @@ pub fn sa_surface(
 pub fn sa_surface_core(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
-    count: usize,
+    n: usize,
     pr: Option<f64>,
     index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
-    let y = dotsphere(count);
+    let y = dotsphere(n);
 
     let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
     let mut cross_v = Vec::new();
-    let need_cross = y_ptr < 4.;
+    let need_cross = y_ptr < 2.;
+    log::info!("need_cross = {}", need_cross);
     if need_cross {
         cross_v = vec![Vec::<usize>::new(); coors.nrows()];
         find_cross_ball(coors, elements, &mut cross_v, y_ptr);
