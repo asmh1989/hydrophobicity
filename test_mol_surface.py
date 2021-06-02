@@ -4,7 +4,7 @@ import numpy as np
 from mol_surface import connolly_surface, sa_surface
 
 from pdb_io import to_xyz, read_pdb
-from find_pocket import find_pocket, gen_grid, pas_search_for_pocket, sas_search_del
+from find_pocket import find_pocket, gen_grid, pas_search_for_pocket, sas_search_del, layer_grids
 
 import logging
 
@@ -93,6 +93,14 @@ def test_find_pockets_python2():
     grids = find_pocket(c, e, n,  20, enable_ext=False)
     print("grids = ", grids.shape)
     assert(grids.shape[0] == 6460)
+
+
+def test_find_layer_python():
+    n = 100
+    p = pdb_4ey5
+    c, e, r = read_pdb(p)
+    grids = layer_grids(c, e, n,  20)
+    print("grids = ", grids.shape)
 
 
 def test_custom_data():

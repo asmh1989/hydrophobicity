@@ -9,7 +9,7 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::{config::get_all_vdw, surface::sa_surface_core};
+use crate::{config::get_vdw_vec, surface::sa_surface_core};
 
 ///
 /// 网格生成
@@ -197,25 +197,23 @@ pub fn find_pockets(
     n: usize,
     pr: Option<f64>,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+    // 求得原子半径集合缓存, 下面多个方法需要使用
+    let mut radis_v = vec![0.; coors.nrows()];
+    get_vdw_vec(elements, &mut radis_v);
+
+    find_pockets_core(coors, &radis_v, n, pr)
+}
+
+pub fn find_pockets_core(
+    coors: &ArrayView2<'_, f64>,
+    radis_v: &Vec<f64>,
+    n: usize,
+    pr: Option<f64>,
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let mut xyz = [0.; 9];
 
-    // 求得原子半径集合缓存, 下面多个方法需要使用
-    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-    let mm = get_all_vdw();
-    let get_vdw_radii = move |elements: Option<&Vec<&str>>, i: usize| {
-        if let Some(e) = elements {
-            mm.get(e[i]).unwrap() + 0.
-        } else {
-            0.
-        }
-    };
-    let mut radis_v = vec![0.; coors.nrows()];
-    radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
-        *v = get_vdw_radii(elements, i);
-    });
-
     // 辅助sa surface
-    let dot = sa_surface_core(&coors.view(), &radis_v, n, y_ptr, false);
+    let dot = sa_surface_core(&coors.view(), &radis_v, n, pr, false);
 
     log::info!("shape: {:?}", dot.shape());
 
@@ -232,6 +230,24 @@ pub fn find_pockets(
     let grid1 = select_point(&dot.view(), None, &grid1.view(), pr);
     log::info!("2222 shape: {:?}", grid1.shape());
     grid1
+}
+
+///
+/// 给找到的pockets分层
+///
+pub fn find_layer(
+    coors: &ArrayView2<'_, f64>,
+    elements: Option<&Vec<&str>>,
+    n: usize,
+    pr: Option<f64>,
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+    // 求得原子半径集合缓存, 下面多个方法需要使用
+    let mut radis_v = vec![0.; coors.nrows()];
+    get_vdw_vec(elements, &mut radis_v);
+
+    let grid = find_pockets_core(coors, &radis_v, n, pr);
+
+    grid
 }
 
 #[cfg(test)]
