@@ -10,6 +10,7 @@ use rayon::prelude::*;
 
 use crate::config::get_vdw_vec;
 
+/// 缓存单位球的均等分点
 static DOTS: OnceCell<RwLock<HashMap<usize, Vec<f64>>>> = OnceCell::new();
 
 /// vec 并行计算 求球的均等分点 效率最高
@@ -122,6 +123,9 @@ pub fn sa_surface(
     sa_surface_core(coors, &radis_v, count, pr, index)
 }
 
+///
+/// 求蛋白质sa平面点集合
+///
 pub fn sa_surface_core(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
@@ -137,17 +141,22 @@ pub fn sa_surface_core(
 
     let dd = Mutex::new(Vec::<f64>::new());
 
+    // 缓存半径计算
     let ele = elements
         .into_par_iter()
         .map(|f| (*f + y_ptr).powi(2) - 1e-6)
         .collect::<Vec<f64>>();
 
+    // 遍历原子集合
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let r = elements[i] + y_ptr;
+
+        // 生成该原子上的均等分点
         let ball2 = ball.mapv(|b| b * r) + coors.row(i);
 
         let filer = Mutex::new(Vec::<usize>::with_capacity(n / 4));
 
+        // 遍历这些点, 开始刷选在其余原子半径内的点
         (0..n).into_par_iter().for_each(|j| {
             let mut result = true;
             let b = ball2.row(j);
@@ -160,7 +169,7 @@ pub fn sa_surface_core(
                     break;
                 }
             }
-
+            // 不在半径内即为重叠部分, 选中
             if result {
                 filer.lock().unwrap().push(j);
             }

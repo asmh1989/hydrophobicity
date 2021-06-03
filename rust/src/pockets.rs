@@ -229,6 +229,15 @@ pub fn find_pockets_core(
     grid1
 }
 
+///
+/// 给pockets集合,进行分层标记
+///
+/// * `grid`: `Pockets`集合
+/// * `coors`: 标记辅助集合点, 还是用距离算法
+/// * `label`: 当前标记值
+/// * `vec`: 原子半径集合
+/// * `pr`: 辅助半径
+///
 pub fn label_from_grid(
     grid: &ArrayView2<'_, f64>,
     coors: &ArrayView2<'_, f64>,
@@ -264,6 +273,7 @@ pub fn label_from_grid(
     });
 }
 
+/// layer 层级及对应label定义
 const PROBE_RADIIS: [(f64, i32); 8] = [
     (7.0, -993),
     (6.3, -930),
@@ -294,6 +304,7 @@ pub fn find_layer(
 
     let mut vec = vec![0.; rows];
 
+    // 根据指定的分层逻辑,开始遍历分层
     PROBE_RADIIS.iter().for_each(|f| {
         info!("start sa_surface_core pr={}", f.0);
         let dots = sa_surface_core(coors, &radis_v, n, Some(f.0), false);
