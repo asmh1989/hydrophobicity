@@ -1,15 +1,31 @@
-use std::{f64::consts::PI, sync::Mutex};
+use std::{
+    collections::HashMap,
+    f64::consts::PI,
+    sync::{Mutex, RwLock},
+};
 
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
+use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 
 use crate::config::get_vdw_vec;
+
+static DOTS: OnceCell<RwLock<HashMap<usize, Vec<f64>>>> = OnceCell::new();
 
 /// vec 并行计算 求球的均等分点 效率最高
 #[inline]
 pub fn dotsphere(
     n: usize,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+    let dot = DOTS.get();
+    if let Some(e) = dot {
+        let e1 = e.read().unwrap();
+        if e1.contains_key(&n) {
+            let v = e1.get(&n).unwrap().to_owned();
+            log::info!("read from cache dots");
+            return Array::from_shape_vec((n, 3), v).unwrap();
+        }
+    }
     let golden_ratio: f64 = (1f64 + 5f64.powf(0.5)) / 2f64;
 
     let mut data = vec![0.; n * 3];
@@ -29,6 +45,20 @@ pub fn dotsphere(
             }
         }
     });
+
+    match dot {
+        Some(e) => {
+            let e = &mut e.write().unwrap();
+            e.insert(n, data.clone());
+        }
+        None => {
+            let mut v = HashMap::<usize, Vec<f64>>::new();
+            v.insert(n, data.clone());
+            DOTS.set(RwLock::new(v)).unwrap();
+        }
+    }
+
+    log::info!("new dots...");
 
     Array::from_shape_vec((n, 3), data).unwrap()
 }
@@ -109,7 +139,7 @@ pub fn sa_surface_core(
 
     let ele = elements
         .into_par_iter()
-        .map(|f| (*f + y_ptr).powi(2))
+        .map(|f| (*f + y_ptr).powi(2) - 1e-6)
         .collect::<Vec<f64>>();
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
@@ -119,19 +149,19 @@ pub fn sa_surface_core(
         let filer = Mutex::new(Vec::<usize>::with_capacity(n / 4));
 
         (0..n).into_par_iter().for_each(|j| {
-            let mut result = false;
+            let mut result = true;
             let b = ball2.row(j);
             for c in 0..coors.nrows() {
-                let r = ele[c];
                 let cc = coors.row(c);
+                let r = ele[c];
                 let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
-                if r1 < r && r - r1 > 1e-6 {
-                    result = true;
+                if r1 < r {
+                    result = false;
                     break;
                 }
             }
 
-            if result == false {
+            if result {
                 filer.lock().unwrap().push(j);
             }
         });
@@ -173,7 +203,13 @@ mod tests {
         let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
         info!("done ....{:?}", d.shape());
 
-        assert_eq!(22795, d.shape()[0]);
+        let n = 200;
+
+        info!("start ....");
+        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
+        info!("done ....{:?}", d.shape());
+
+        assert_eq!(456, d.shape()[0]);
     }
 
     #[test]

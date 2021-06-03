@@ -16,7 +16,7 @@ pdb_4ey5 = 'data/4ey5_clean.pdb'
 pdb = pdb_4ey5
 
 n = 100
-c, e, r = read_pdb(pdb_6f6s)
+c, e, r = read_pdb(pdb_4ey5)
 
 
 def test_sa_surface_rust(p=pdb):
