@@ -2,8 +2,8 @@
 """
 Created on 2021-6-1
 
-uff angle term 
-return energy and gradient 
+uff angle term
+return energy and gradient
 
 @author: likun.yang
 """
@@ -36,7 +36,7 @@ def get_angles_list(bonds):
 
     angles = []
     N = len(bonds)
-    #print("There are %d bonds" % (N))
+    # print("There are %d bonds" % (N))
     # for i in range(N):
     #     bonds[i] = sorted_pair(bonds[i][0], bonds[i][1])
 
@@ -61,7 +61,7 @@ def get_angles_list(bonds):
                 node = c[1]
                 angle = (c[0], node, d[0])
                 angles.append(angle)
-    #print("There are %d angles" % (len(angles)))
+    # print("There are %d angles" % (len(angles)))
     return angles
 
 
@@ -86,7 +86,7 @@ def cal_angle_force_constant(atom_type_i, atom_type_j, atom_type_k, theta0):
 def cal_cosTheta(a, b, c):
     '''
     a,b,c: np.array, (xyz)
-    return : cos theta between ab, bc vector 
+    return : cos theta between ab, bc vector
     '''
     dis_ab = get_distance(a, b)
     dis_bc = get_distance(b, c)
@@ -103,7 +103,7 @@ def cal_energy_expansion_coeff(theta0):
     '''
     sinTheta0 = np.sin(theta0)
     cosTheta0 = np.cos(theta0)
-    d_C2 = 1. / (4. * (sinTheta0 * sinTheta0))
+    d_C2 = 1. / (4. * max((sinTheta0 * sinTheta0), 0.00000001))
     d_C1 = -4. * d_C2 * cosTheta0
     d_C0 = d_C2 * (2. * cosTheta0 * cosTheta0 + 1.)
     return (d_C0, d_C1, d_C2)
@@ -116,7 +116,7 @@ def cal_dE_dtheta(forceConstant, d_C1, d_C2, sinTheta, sin2Theta):
 
 def cal_angle_energy_grad(angle, coors, eles):
     '''
-    Note : Can only apply to general case. Need Optimazation 
+    Note : Can only apply to general case. Need Optimazation
     ref : rdkit uff
     2021-6-2 Likun.Yang
     '''
@@ -156,7 +156,8 @@ def cal_angle_energy_grad(angle, coors, eles):
     dist_ba = get_distance(pos_b, pos_a)
     dist_bc = get_distance(pos_b, pos_c)
 
-    sinTheta = np.sqrt(sinThetaSq)
+    sinTheta = max(np.sqrt(sinThetaSq), 0.00000001)
+    # print(sinTheta)
     sin2Theta = 2. * sinTheta * cosTheta
 
     dE_dTheta = cal_dE_dtheta(force_cons, d_C1, d_C2, sinTheta, sin2Theta)
@@ -177,7 +178,7 @@ Determination of Forces from a Potential in Molecular Dynamics (google it)
 this is how rdkit determine grad:
 
 
-dCos_dS[6] = 
+dCos_dS[6] =
                       {1.0 / dist[0] * (r[1].x - cosTheta * r[0].x),
                        1.0 / dist[0] * (r[1].y - cosTheta * r[0].y),
                        1.0 / dist[0] * (r[1].z - cosTheta * r[0].z),
@@ -198,16 +199,6 @@ dCos_dS[6] =
   g[2][2] += dE_dTheta * dCos_dS[5] / (-sinTheta);
 '''
 
-# def optimization_SD(points):
-#     pos = points
-#     for i in range(100):
-#         dis_ma = gen_distance_matrix(pos)
-#         energy = get_total_E(dis_ma)
-#         grad = get_grad(pos)
-#         pos = pos - (10 * grad)
-#         print(energy)
-#     return pos
-
 
 def get_angles_energy_grad(coors, eles):
     E = 0
@@ -226,3 +217,12 @@ def get_angles_energy_grad(coors, eles):
         grad[atom_j] += tmp[2]
         grad[atom_k] += tmp[3]
     return (E, grad)
+
+
+def optimization_SD(coors, eles, maxIter=50):
+    pos = coors
+    for i in range(maxIter):
+        E, G = get_angles_energy_grad(pos, eles)
+        pos = pos - (0.001 * G)
+        print('E = {:6.2f}\n'.format(E), 'G = {}'.format(G.round(2)))
+    return pos
