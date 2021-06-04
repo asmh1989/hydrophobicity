@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 from core import vdw_radii
 from mol_surface import sa_surface
-from sz_py_ext import find_pocket as find_pocket_rust
+from sz_py_ext import find_pocket as find_pocket_rust, find_layer
 probe_radiis = {7.0: -993, 6.3: -930, 5.6: -761,
                 4.9: -464, 4.2: -195, 3.5: -64, 2.8: -19, 2.1: -5}
 
@@ -137,7 +137,10 @@ def label_grids(grids, pas, pr=20):
     return grids
 
 
-def layer_grids(coors, eles, n=40, pr=20):
+def layer_grids(coors, eles, n=40, pr=20, enable_ext=True):
+    if enable_ext:
+        return find_layer(coors, eles, n, pr)
+
     pocket_grids = find_pocket(coors, eles, n=n, pas_r=pr)
     grids = np.insert(pocket_grids, 3, 0, axis=1)  # 标记为0
     for pr in probe_radiis:

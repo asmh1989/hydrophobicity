@@ -10,6 +10,7 @@ use std::{collections::HashMap, sync::Mutex};
 
 use log::warn;
 use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 const VDW_RADII: Lazy<Mutex<HashMap<&str, f64>>> = Lazy::new(|| {
     let m = [
@@ -88,6 +89,21 @@ pub fn get_vdw_radii(elements: Option<&Vec<&str>>, pr: f64, i: usize) -> f64 {
 
 pub fn get_all_vdw() -> HashMap<&'static str, f64> {
     VDW_RADII.lock().unwrap().clone()
+}
+
+pub fn get_vdw_vec(elements: Option<&Vec<&str>>, radis_v: &mut Vec<f64>) {
+    let mm = get_all_vdw();
+    let get_vdw_radii = move |elements: Option<&Vec<&str>>, i: usize| {
+        if let Some(e) = elements {
+            mm.get(e[i]).unwrap() + 0.
+        } else {
+            0.
+        }
+    };
+
+    radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
+        *v = get_vdw_radii(elements, i);
+    });
 }
 
 pub fn init_config() {

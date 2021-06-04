@@ -1,18 +1,32 @@
 use std::{
+    collections::HashMap,
     f64::consts::PI,
-    sync::{Arc, Mutex},
+    sync::{Mutex, RwLock},
 };
 
 use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
+use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 
-use crate::config::get_all_vdw;
+use crate::config::get_vdw_vec;
+
+/// 缓存单位球的均等分点
+static DOTS: OnceCell<RwLock<HashMap<usize, Vec<f64>>>> = OnceCell::new();
 
 /// vec 并行计算 求球的均等分点 效率最高
 #[inline]
 pub fn dotsphere(
     n: usize,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
+    let dot = DOTS.get();
+    if let Some(e) = dot {
+        let e1 = e.read().unwrap();
+        if e1.contains_key(&n) {
+            let v = e1.get(&n).unwrap().to_owned();
+            log::info!("read from cache dots");
+            return Array::from_shape_vec((n, 3), v).unwrap();
+        }
+    }
     let golden_ratio: f64 = (1f64 + 5f64.powf(0.5)) / 2f64;
 
     let mut data = vec![0.; n * 3];
@@ -33,6 +47,20 @@ pub fn dotsphere(
         }
     });
 
+    match dot {
+        Some(e) => {
+            let e = &mut e.write().unwrap();
+            e.insert(n, data.clone());
+        }
+        None => {
+            let mut v = HashMap::<usize, Vec<f64>>::new();
+            v.insert(n, data.clone());
+            DOTS.set(RwLock::new(v)).unwrap();
+        }
+    }
+
+    log::info!("new dots...");
+
     Array::from_shape_vec((n, 3), data).unwrap()
 }
 
@@ -52,7 +80,7 @@ fn find_cross_ball(
     pr: f64,
 ) {
     let n = coors.nrows();
-    let vv = Arc::new(Mutex::new(v));
+    let vv = Mutex::new(v);
     (0..n).into_par_iter().for_each(|i| {
         (i..n)
             .into_iter()
@@ -88,81 +116,67 @@ pub fn sa_surface(
     index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
     let count = if n.is_none() { 100 } else { n.unwrap() };
-    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
-    let row = coors.nrows();
+    let mut radis_v = vec![0.; coors.nrows()];
+    get_vdw_vec(elements, &mut radis_v);
 
-    let mm = get_all_vdw();
-
-    let get_vdw_radii = move |elements: Option<&Vec<&str>>, i: usize| {
-        if let Some(e) = elements {
-            mm.get(e[i]).unwrap() + 0.
-        } else {
-            0.
-        }
-    };
-
-    let mut radis_v = vec![0.; row];
-    radis_v.par_iter_mut().enumerate().for_each(|(i, v)| {
-        *v = get_vdw_radii(elements, i);
-    });
-
-    sa_surface_core(coors, &radis_v, count, y_ptr, index)
+    sa_surface_core(coors, &radis_v, count, pr, index)
 }
 
+///
+/// 求蛋白质sa平面点集合
+///
 pub fn sa_surface_core(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
-    count: usize,
-    pr: f64,
+    n: usize,
+    pr: Option<f64>,
     index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
-    let y = dotsphere(count);
+    let ball = dotsphere(n);
 
-    let mut cross_v = Vec::new();
-    let need_cross = pr < 4.;
-    if need_cross {
-        cross_v = vec![Vec::<usize>::new(); coors.nrows()];
-        find_cross_ball(coors, elements, &mut cross_v, pr);
-    }
+    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
 
     let col = if index { 4 } else { 3 };
 
     let dd = Mutex::new(Vec::<f64>::new());
 
+    // 缓存半径计算
+    let ele = elements
+        .into_par_iter()
+        .map(|f| (*f + y_ptr).powi(2) - 1e-6)
+        .collect::<Vec<f64>>();
+
+    // 遍历原子集合
     (0..coors.nrows()).into_par_iter().for_each(|i| {
-        let r = elements[i] + pr;
-        let b2 = y.mapv(|b| b * r) + coors.row(i);
+        let r = elements[i] + y_ptr;
 
-        let filer = Mutex::new(Vec::<usize>::new());
+        // 生成该原子上的均等分点
+        let ball2 = ball.mapv(|b| b * r) + coors.row(i);
 
-        (0..b2.nrows()).into_par_iter().for_each(|i2| {
-            let mut result = false;
-            let a1 = b2.row(i2);
-            for j in 0..coors.nrows() {
-                if need_cross {
-                    if !cross_v[i].contains(&j) {
-                        continue;
-                    }
-                }
-                let r = (elements[j] + pr).powi(2);
-                let b1 = coors.row(j);
-                let r1 =
-                    (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
-                if r1 < r && r - r1 > 1e-6 {
-                    result = true;
+        let filer = Mutex::new(Vec::<usize>::with_capacity(n / 4));
+
+        // 遍历这些点, 开始刷选在其余原子半径内的点
+        (0..n).into_par_iter().for_each(|j| {
+            let mut result = true;
+            let b = ball2.row(j);
+            for c in 0..coors.nrows() {
+                let cc = coors.row(c);
+                let r = ele[c];
+                let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
+                if r1 < r {
+                    result = false;
                     break;
                 }
             }
-
-            if result == false {
-                filer.lock().unwrap().push(i2);
+            // 不在半径内即为重叠部分, 选中
+            if result {
+                filer.lock().unwrap().push(j);
             }
         });
 
-        let u = b2.select(Axis(0), &filer.lock().unwrap());
+        let u = ball2.select(Axis(0), &filer.lock().unwrap());
 
-        let mut v = vec![0.; u.nrows() * col];
         let data = if index {
             let four = Array::<f64, _>::zeros((u.nrows(), 1)).mapv(|_| i as f64);
             concatenate![Axis(1), u, four]
@@ -170,11 +184,7 @@ pub fn sa_surface_core(
             u
         };
 
-        v.par_iter_mut().enumerate().for_each(|(i, value)| {
-            let rows = (i - i % col) / col;
-            *value = data[[rows, i % col]];
-        });
-        dd.lock().unwrap().extend(v.iter());
+        dd.lock().unwrap().extend(data.iter().map(|f| *f));
     });
 
     let ddd = dd.lock().unwrap().to_owned();
@@ -202,7 +212,13 @@ mod tests {
         let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
         info!("done ....{:?}", d.shape());
 
-        assert_eq!(22795, d.shape()[0]);
+        let n = 200;
+
+        info!("start ....");
+        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
+        info!("done ....{:?}", d.shape());
+
+        assert_eq!(456, d.shape()[0]);
     }
 
     #[test]

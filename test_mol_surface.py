@@ -4,7 +4,7 @@ import numpy as np
 from mol_surface import connolly_surface, sa_surface
 
 from pdb_io import to_xyz, read_pdb
-from find_pocket import find_pocket, gen_grid, pas_search_for_pocket, sas_search_del
+from find_pocket import find_pocket, gen_grid, pas_search_for_pocket, sas_search_del, layer_grids
 
 import logging
 
@@ -16,7 +16,7 @@ pdb_4ey5 = 'data/4ey5_clean.pdb'
 pdb = pdb_4ey5
 
 n = 100
-c, e, r = read_pdb(pdb_6f6s)
+c, e, r = read_pdb(pdb_4ey5)
 
 
 def test_sa_surface_rust(p=pdb):
@@ -91,8 +91,34 @@ def test_find_pockets_python2():
     p = pdb_6f6s
     c, e, r = read_pdb(p)
     grids = find_pocket(c, e, n,  20, enable_ext=False)
-    print("grids = ", grids.shape)
+    logger.info("grids = %s", grids.shape)
     assert(grids.shape[0] == 6460)
+
+
+def test_find_layer_rust():
+    logger.info("test_find_layer_rust...")
+    n = 100
+    p = pdb_4ey5
+    c, e, _ = read_pdb(p)
+    logger.info("start find layer...")
+    grids = layer_grids(c, e, n,  20)
+    logger.info("grids = %s", grids.shape)
+    dm = grids[:, 3]
+    assert(grids[dm == -993].shape[0] == 9660)
+    assert(grids[dm == -64].shape[0] == 593)
+
+
+def test_find_layer_python():
+    logger.info("test_find_layer_python...")
+    n = 100
+    p = pdb_4ey5
+    c, e, r = read_pdb(p)
+    logger.info("start find layer...")
+    grids = layer_grids(c, e, n,  20, False)
+    logger.info("grids = %s", grids.shape)
+    dm = grids[:, 3]
+    assert(grids[dm == -993].shape[0] == 9660)
+    assert(grids[dm == -64].shape[0] == 593)
 
 
 def test_custom_data():
@@ -304,14 +330,13 @@ def test_custom_data():
                   "O",
                   "CB",
                   "CG"])
-    dot = sa_surface(c, e, n=100, pr=20)
-    print('shape = ', dot.shape)
-    pocket_grids = gen_grid(c, n=1)
-    print('shape = ', pocket_grids.shape)
-    pocket_grids = sas_search_del(c, e, pocket_grids, pr=1.4)
-    print('shape = ', pocket_grids.shape)
-    pocket_grids = pas_search_for_pocket(pocket_grids, dot, n=n, pr=20)
-    print('shape = ', pocket_grids.shape)
-
-    # grid = find_pocket(c, e, 100, 20)
-    # print('shape = ', grid.shape)
+    # dot = sa_surface(c, e, n=100, pr=20)
+    # print('shape = ', dot.shape)
+    # pocket_grids = gen_grid(c, n=1)
+    # print('shape = ', pocket_grids.shape)
+    # pocket_grids = sas_search_del(c, e, pocket_grids, pr=1.4)
+    # print('shape = ', pocket_grids.shape)
+    # pocket_grids = pas_search_for_pocket(pocket_grids, dot, n=n, pr=20)
+    # print('shape = ', pocket_grids.shape)
+    grid = layer_grids(c, e, 100, 20)
+    print('shape = ', grid)
