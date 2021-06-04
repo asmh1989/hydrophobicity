@@ -21,7 +21,7 @@ pdb = pdb_6fyi
 
 def test_6fs6_run_hydro_rust():
     pdb = pdb_6fs6
-    logging.info("test_run_hydro_rust...")
+    logging.info("test_6fs6_run_hydro_rust...")
     h = run_hydro(pdb, dir='test', n=100)
     hyo = h[:, 3]
     logger.info("hyo max = %s, min = %s, m = %s, len = %s",
@@ -31,12 +31,17 @@ def test_6fs6_run_hydro_rust():
     assert(math.isclose(-76.97541431222143, np.mean(hyo), rel_tol=1e-6))
     assert(6460 == hyo.shape[0])
 
-    logging.info("test_run_hydro_rust done ...")
+    logging.info("test_6fs6_run_hydro_rust done ...")
 
 
 def test_run_hydro_rust():
-    pdb = pdb_4ey5
     logging.info("test_run_hydro_rust...")
+    h = run_hydro(pdb, dir='test', n=100)
+
+
+def test_4ey5_run_hydro_rust():
+    pdb = pdb_4ey5
+    logging.info("test_4ey5_run_hydro_rust...")
     h = run_hydro(pdb, dir='test', n=100)
     hyo = h[:, 3]
     logger.info("hyo max = %s, min = %s, m = %s, len = %s",
@@ -46,7 +51,7 @@ def test_run_hydro_rust():
     assert(math.isclose(-75.44844935474565, np.mean(hyo), rel_tol=1e-6))
     assert(14389 == hyo.shape[0])
 
-    logging.info("test_run_hydro_rust done ...")
+    logging.info("test_4ey5_run_hydro_rust done ...")
 
 
 def test_6fs6_run_hydro_python():
