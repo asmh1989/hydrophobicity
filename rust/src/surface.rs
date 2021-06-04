@@ -23,7 +23,7 @@ pub fn dotsphere(
         let e1 = e.read().unwrap();
         if e1.contains_key(&n) {
             let v = e1.get(&n).unwrap().to_owned();
-            log::info!("read from cache dots");
+            // log::info!("read from cache dots");
             return Array::from_shape_vec((n, 3), v).unwrap();
         }
     }
@@ -190,6 +190,64 @@ pub fn sa_surface_core(
     let ddd = dd.lock().unwrap().to_owned();
 
     Array::from_shape_vec((ddd.len() / col, col), ddd).unwrap()
+}
+
+///
+/// 求蛋白质sa平面点集合, 返回字典数据, 对应每个原子上的返回点个数
+///
+pub fn sa_surface_return_map(
+    coors: &ArrayView2<'_, f64>,
+    elements: &Vec<f64>,
+    n: usize,
+    pr: Option<f64>,
+) -> HashMap<usize, f64> {
+    let ball = dotsphere(n);
+
+    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
+
+    let dd = Mutex::new(HashMap::<usize, f64>::new());
+
+    // 缓存半径计算
+    let ele = elements
+        .into_par_iter()
+        .map(|f| (*f + y_ptr).powi(2) - 1e-6)
+        .collect::<Vec<f64>>();
+
+    // 遍历原子集合
+    (0..coors.nrows()).into_par_iter().for_each(|i| {
+        let r = elements[i] + y_ptr;
+
+        // 生成该原子上的均等分点
+        let ball2 = ball.mapv(|b| b * r) + coors.row(i);
+
+        let filer = Mutex::new(0);
+
+        // 遍历这些点, 开始刷选在其余原子半径内的点
+        (0..n).into_par_iter().for_each(|j| {
+            let mut result = true;
+            let b = ball2.row(j);
+            for c in 0..coors.nrows() {
+                let cc = coors.row(c);
+                let r = ele[c];
+                let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
+                if r1 < r {
+                    result = false;
+                    break;
+                }
+            }
+            // 不在半径内即为重叠部分, 选中
+            if result {
+                *filer.lock().unwrap() += 1;
+            }
+        });
+
+        let pecent = filer.lock().unwrap().to_owned() as f64 / n as f64;
+
+        dd.lock().unwrap().insert(i, pecent);
+    });
+
+    let m = dd.lock().unwrap().to_owned();
+    m
 }
 
 #[cfg(test)]
