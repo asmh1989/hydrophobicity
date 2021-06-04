@@ -2,6 +2,11 @@
 """
 cal uff bond term
 return bond energy and bond force
+Ref : 
+1) paper, uff, a full periodic table force filed for molecular mechanics and molelular
+dynamics simulations
+
+2)open source, rdkit
 
 Created on Wed May 12 09:01:49 2021
 
