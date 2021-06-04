@@ -139,7 +139,7 @@ def run_hydro(filename, n=100, pas_r=20, dir='.', enable_ext=True):
         hyo = grid_hyo[:, -1]
         pdb_io.to_pdb(grid_coors, hyo,
                       filename='{}/{}_hyo_rust.pdb'.format(dir, filename[:-4]))
-        return
+        return grid_hyo
 
     layered_grids = layer_grids(
         atom_coors, eles, n=n, pr=pas_r)
@@ -150,3 +150,4 @@ def run_hydro(filename, n=100, pas_r=20, dir='.', enable_ext=True):
     pdb_io.to_pdb(grid_coors, hyo,
                   filename='{}/{}_hyo.pdb'.format(dir, filename[:-4]))
     print('Done')
+    return np.insert(grid_coors, 3, hyo, axis=1)
