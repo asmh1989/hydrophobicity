@@ -7,9 +7,7 @@ return energy and gradient
 
 @author: likun.yang
 """
-from os import EX_CANTCREAT
 import numpy as np
-from numpy.lib.function_base import _gradient_dispatcher
 from conformation.uff_bond import *
 
 
