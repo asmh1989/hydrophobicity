@@ -142,6 +142,7 @@ def cal_angle_energy_grad(angle, coors, eles):
     # angle between 2 bonds that construct the angle
 
     cosTheta = cal_cosTheta(pos_a, pos_b, pos_c)
+    # print(cosTheta)
 
     sinThetaSq = 1.0 - cosTheta * cosTheta
     cos2Theta = cosTheta * cosTheta - sinThetaSq  # cos2x = cos^2x - sin^2x
@@ -150,19 +151,23 @@ def cal_angle_energy_grad(angle, coors, eles):
     Energy = force_cons * angle_term
     #####
     # start to cal force
-
-    ba_vec = pos_b - pos_a
-    bc_vec = pos_b - pos_c
     dist_ba = get_distance(pos_b, pos_a)
     dist_bc = get_distance(pos_b, pos_c)
+
+    norm_ba_vec = (pos_b - pos_a)/dist_ba
+    norm_bc_vec = (pos_b - pos_c)/dist_bc
+    #print(ba_vec, bc_vec)
+    # print(cosTheta*ba_vec)
 
     sinTheta = max(np.sqrt(sinThetaSq), 0.00000001)
     # print(sinTheta)
     sin2Theta = 2. * sinTheta * cosTheta
 
     dE_dTheta = cal_dE_dtheta(force_cons, d_C1, d_C2, sinTheta, sin2Theta)
-    dTheta_dPos_a = 1/((bc_vec - cosTheta*ba_vec)*dist_ba*(-1)*sinTheta)
-    dTheta_dPos_c = 1/((ba_vec - cosTheta*bc_vec)*dist_bc*(-1)*sinTheta)
+    dTheta_dPos_a = (
+        1/dist_ba*(norm_bc_vec - cosTheta*norm_ba_vec))*(-1)/sinTheta
+    dTheta_dPos_c = (
+        1/dist_bc*(norm_ba_vec - cosTheta*norm_bc_vec))*(-1)/sinTheta
     grad_a = dE_dTheta * dTheta_dPos_a
     grad_c = dE_dTheta * dTheta_dPos_c
     grad_b = -(grad_a + grad_c)
@@ -219,10 +224,10 @@ def get_angles_energy_grad(coors, eles):
     return (E, grad)
 
 
-def optimization_SD(coors, eles, maxIter=50):
+def optimization_SD(coors, eles, maxIter=100):
     pos = coors
     for i in range(maxIter):
         E, G = get_angles_energy_grad(pos, eles)
-        pos = pos - (0.001 * G)
+        pos = pos - (0.0001 * G)
         print('E = {:6.2f}\n'.format(E), 'G = {}'.format(G.round(2)))
     return pos
