@@ -26,17 +26,17 @@ uff_par = pd.read_csv(uff_par_path, sep='\s+',
 par meaning
 took from rdkit
 
-   double r1;            //!<  valence bond radius
-   double theta0;        //!< valence angle
-   double x1;            //!< vdW characteristic length
-   double D1;            //!< vdW atomic energy
-   double zeta;          //!< vdW scaling term
-   double Z1;            //!< effective charge
-   double V1;            //!< sp3 torsional barrier parameter
-   double U1;            //!< torsional contribution for sp2-sp3 bonds
-   double GMP_Xi;        //!< GMP Electronegativity;
-   double GMP_Hardness;  //!< GMP Hardness
-   double GMP_Radius;    //!< GMP Radius value
+    r1;            //!<  valence bond radius
+    theta0;        //!< valence angle
+    x1;            //!< vdW characteristic length
+    D1;            //!< vdW atomic energy
+    zeta;          //!< vdW scaling term
+    Z1;            //!< effective charge
+    V1;            //!< sp3 torsional barrier parameter
+    U1;            //!< torsional contribution for sp2-sp3 bonds
+    GMP_Xi;        //!< GMP Electronegativity;
+    GMP_Hardness;  //!< GMP Hardness
+    GMP_Radius;    //!< GMP Radius value
 '''
 
 covalent_radii = {'H': 0.23, 'C': 0.68, 'O': 0.68, 'N': 0.68}
