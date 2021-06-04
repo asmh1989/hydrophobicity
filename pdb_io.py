@@ -60,4 +60,3 @@ def to_xyz(data, ele='H', filename='test.xyz'):
     t = pd.DataFrame(data)
     t.insert(0, 'atom', ele)
     t.to_csv(filename, header=None, index=None, sep=' ')
-    print('Done')

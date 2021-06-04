@@ -14,6 +14,7 @@ import pdb_io
 from core import mkdir_by_file, vdw_radii
 from find_pocket import layer_grids
 from mol_surface import sa_surface
+from sz_py_ext import run_hydrophobicity
 
 
 atomic_hydrophobicity_file_path = 'data/atomic_hydrophobicity.csv'
@@ -35,7 +36,7 @@ def get_atomic_sovation_para(resn, atom):
     return atomic_sovation_para
 
 
-def get_accessible_solvent_area(sa, vdw_r, index, n=40):
+def get_accessible_solvent_area(sa, vdw_r, index, n=100):
     '''
     sa : solvent_accessible_points
     n为产生单位圆时取得点数，要与sa_surface用的点数相同
@@ -128,15 +129,25 @@ def cal_grids_hydro(layerd_grids, atom_coors, elements, resns, solvent_accessibl
     return all_hydro
 
 
-def run_hydro(filename, n=40, pas_r=20, dir='.'):
+def run_hydro(filename, n=100, pas_r=20, dir='.', enable_ext=True):
     mkdir_by_file(dir, isDir=True)
     atom_coors, eles, resns = pdb_io.read_pdb(filename)
+
+    if enable_ext:
+        grid_hyo = run_hydrophobicity(atom_coors, eles, resns, n, pas_r)
+        grid_coors = grid_hyo[:, :3]
+        hyo = grid_hyo[:, -1]
+        pdb_io.to_pdb(grid_coors, hyo,
+                      filename='{}/{}_hyo_rust.pdb'.format(dir, filename[:-4]))
+        return grid_hyo
+
     layered_grids = layer_grids(
         atom_coors, eles, n=n, pr=pas_r)
     sa = sa_surface(atom_coors, eles, n=n, pr=1.4)
-    pdb_io.to_xyz(sa, '{}/{}_SAS.xyz'.format(dir, filename[:-4]))
+    pdb_io.to_xyz(sa, filename='{}/{}_SAS.xyz'.format(dir, filename[:-4]))
     hyo = cal_grids_hydro(layered_grids, atom_coors, eles, resns, sa, n=n)
     grid_coors = layered_grids[:, :3]
     pdb_io.to_pdb(grid_coors, hyo,
                   filename='{}/{}_hyo.pdb'.format(dir, filename[:-4]))
     print('Done')
+    return np.insert(grid_coors, 3, hyo, axis=1)

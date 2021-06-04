@@ -298,6 +298,15 @@ pub fn find_layer(
     let mut radis_v = vec![0.; coors.nrows()];
     get_vdw_vec(elements, &mut radis_v);
 
+    find_layer_core(coors, &radis_v, n, pr)
+}
+
+pub fn find_layer_core(
+    coors: &ArrayView2<'_, f64>,
+    radis_v: &Vec<f64>,
+    n: usize,
+    pr: Option<f64>,
+) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let grid = find_pockets_core(coors, &radis_v, n, pr);
 
     let rows = grid.nrows();
@@ -306,9 +315,9 @@ pub fn find_layer(
 
     // 根据指定的分层逻辑,开始遍历分层
     PROBE_RADIIS.iter().for_each(|f| {
-        info!("start sa_surface_core pr={}", f.0);
+        // info!("start sa_surface_core pr={}", f.0);
         let dots = sa_surface_core(coors, &radis_v, n, Some(f.0), false);
-        info!("end sa_surface_core pr={}", f.0);
+        // info!("end sa_surface_core pr={}", f.0);
         label_from_grid(&grid.view(), &dots.view(), f.1 as f64, &mut vec, f.0);
     });
 
