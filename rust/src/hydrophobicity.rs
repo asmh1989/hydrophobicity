@@ -8,6 +8,7 @@ use crate::{
     config::{get_hdp_vec, get_vdw_vec},
     pockets::find_layer_core,
     surface::sa_surface_return_map,
+    utils::distance,
 };
 
 ///
@@ -44,15 +45,19 @@ pub fn run_hydrophobicity(
     let atom_hdp_v = Mutex::new(vec![0.; layer_len]);
 
     info!("sa = {:?}, layer_len = {}", sa.len(), layer_len);
+    let label = layer.column(0).to_vec();
 
+    // 计算每一个pocket点的疏水性
     (0..layer_len).into_par_iter().for_each(|i| {
         let grid = pocket.row(i);
         let atom_h = cal_atom_hydro(&grid, coors, &radis_v, &hdp_v, &sa);
-        let water_h = cal_water_hydro(&grid, &pocket.view(), &layer.column(0).to_vec());
+        let water_h = cal_water_hydro(&grid, &pocket.view(), &label);
         let all = (atom_h + water_h) / 10.;
         let n = &mut atom_hdp_v.lock().unwrap();
         n[i] = all;
     });
+
+    info!("done cal hydrophobicity ...");
 
     let v = atom_hdp_v.lock().unwrap().to_owned();
     let hdp_n = Array::from_shape_vec((layer_len, 1), v).unwrap();
@@ -62,8 +67,14 @@ pub fn run_hydrophobicity(
 
 const HPD_I: f64 = 81.01;
 
-fn filer_point(g: &ArrayView1<'_, f64>, c: &ArrayView1<'_, f64>, i: usize) -> Option<(usize, f64)> {
-    let sum = (c[0] - g[0]).powi(2) + (c[1] - g[1]).powi(2) + (c[2] - g[2]).powi(2);
+///
+/// 根据距离进行`filer`
+///
+/// 返回(index, dis)
+///
+///
+fn filer_point(a: &ArrayView1<'_, f64>, b: &ArrayView1<'_, f64>, i: usize) -> Option<(usize, f64)> {
+    let sum = distance(a, b);
     if sum < HPD_I {
         Some((i, sum.sqrt()))
     } else {
@@ -71,12 +82,20 @@ fn filer_point(g: &ArrayView1<'_, f64>, c: &ArrayView1<'_, f64>, i: usize) -> Op
     }
 }
 
+///
+/// 计算原子对于疏水性的影响
+/// * `grid` : `pocket`格点
+/// * `coors` : 原子集合
+/// * `radis_v`: 原子半径集合
+/// * `hdp_v`: 原子+残基对疏水性的影响值
+/// * `sa_m`: 原子球体上留存的点的百分比字典
+///
 fn cal_atom_hydro(
     grid: &ArrayView1<'_, f64>,
     coors: &ArrayView2<'_, f64>,
     radis_v: &Vec<f64>,
     hdp_v: &Vec<f64>,
-    sa: &HashMap<usize, f64>,
+    sa_m: &HashMap<usize, f64>,
 ) -> f64 {
     (0..coors.nrows())
         .into_iter()
@@ -85,7 +104,7 @@ fn cal_atom_hydro(
             let i = v.0;
             let r = radis_v[i];
             let hdp = hdp_v[i];
-            let a = 4. * PI * (r + 1.4).powi(2) * sa.get(&i).unwrap();
+            let a = 4. * PI * (r + 1.4).powi(2) * sa_m.get(&i).unwrap();
             let dis = v.1 - r - 1.4;
             let hydro_atom = hdp * a * (-0.7 * dis).exp();
             hydro_atom
@@ -93,6 +112,12 @@ fn cal_atom_hydro(
         .sum::<f64>()
 }
 
+///                                                                                                                                                                     
+/// 计算水对于个点疏水性的影响值, 方法是`9i`距离内其他点对于格点影响累计
+/// * `grid`: `pocket`格点
+/// * `pocket`: 格点集合
+/// * `label` : 格点对应的`layer`值
+///
 fn cal_water_hydro(
     grid: &ArrayView1<'_, f64>,
     pocket: &ArrayView2<'_, f64>,
@@ -105,19 +130,16 @@ fn cal_water_hydro(
         .into_iter()
         .filter_map(|f| filer_point(grid, &pocket.row(f), f))
         .for_each(|v| {
-            let d2 = (-0.7 * v.1).exp();
+            let d = (-0.7 * v.1).exp();
             let h = label[v.0];
-            // let c = pocket.row(i);
-            // info!("p{:?}, d-h{:?}", (c[0], c[1], c[2]), (v.1, h),);
-
-            f += d2 * h;
-            p += d2;
+            f += d * h;
+            p += d;
         });
 
     let r = f / p;
 
     // info!(
-    //     "cal_water_hydro = {:?},     ############   water_h = {}",
+    //     "cal_water_hydro = {:?},     water_h = {}",
     //     grid, r
     // );
     r

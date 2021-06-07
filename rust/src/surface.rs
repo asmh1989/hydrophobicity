@@ -4,11 +4,11 @@ use std::{
     sync::{Mutex, RwLock},
 };
 
-use ndarray::{concatenate, Array, ArrayBase, ArrayView1, ArrayView2, Axis, Dim, OwnedRepr};
+use ndarray::{concatenate, Array, ArrayBase, ArrayView2, Axis, Dim, OwnedRepr};
 use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 
-use crate::config::get_vdw_vec;
+use crate::{config::get_vdw_vec, utils::distance};
 
 /// 缓存单位球的均等分点
 static DOTS: OnceCell<RwLock<HashMap<usize, Vec<f64>>>> = OnceCell::new();
@@ -19,6 +19,8 @@ pub fn dotsphere(
     n: usize,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let dot = DOTS.get();
+
+    // 判断是否有缓存
     if let Some(e) = dot {
         let e1 = e.read().unwrap();
         if e1.contains_key(&n) {
@@ -62,42 +64,6 @@ pub fn dotsphere(
     log::info!("new dots...");
 
     Array::from_shape_vec((n, 3), data).unwrap()
-}
-
-// 比较两个球心是不是太远, 一样的点 也认为是太远
-pub fn compare_two(a1: &ArrayView1<f64>, a2: &ArrayView1<f64>, r1: f64, r2: f64) -> bool {
-    let a = a1 - a2;
-    let r = a.mapv(|i| i * i).sum();
-
-    r < 1e-6 || r > (r1 + r2) * (r1 + r2)
-}
-
-// 球体相交的原子关系列表
-fn find_cross_ball(
-    coors: &ArrayView2<'_, f64>,
-    elements: &Vec<f64>,
-    v: &mut Vec<Vec<usize>>,
-    pr: f64,
-) {
-    let n = coors.nrows();
-    let vv = Mutex::new(v);
-    (0..n).into_par_iter().for_each(|i| {
-        (i..n)
-            .into_iter()
-            .filter(|x| {
-                !compare_two(
-                    &coors.row(i),
-                    &coors.row(*x),
-                    elements[i] + pr,
-                    elements[*x] + pr,
-                )
-            })
-            .for_each(|x| {
-                let vvv = &mut vv.lock().unwrap();
-                &mut vvv[i].push(x);
-                &mut vvv[x].push(i);
-            });
-    });
 }
 
 ///
@@ -163,7 +129,7 @@ pub fn sa_surface_core(
             for c in 0..coors.nrows() {
                 let cc = coors.row(c);
                 let r = ele[c];
-                let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
+                let r1 = distance(&cc, &b);
                 if r1 < r {
                     result = false;
                     break;
@@ -178,7 +144,7 @@ pub fn sa_surface_core(
         let u = ball2.select(Axis(0), &filer.lock().unwrap());
 
         let data = if index {
-            let four = Array::<f64, _>::zeros((u.nrows(), 1)).mapv(|_| i as f64);
+            let four = Array::from_shape_fn((u.nrows(), 1), |(_, _)| i as f64);
             concatenate![Axis(1), u, four]
         } else {
             u
@@ -193,7 +159,7 @@ pub fn sa_surface_core(
 }
 
 ///
-/// 求蛋白质sa平面点集合, 返回字典数据, 对应每个原子上的返回点个数
+/// 求蛋白质sa平面点集合, 返回字典数据, 对应每个原子上的返回点个数百分比
 ///
 pub fn sa_surface_return_map(
     coors: &ArrayView2<'_, f64>,
@@ -229,7 +195,7 @@ pub fn sa_surface_return_map(
             for c in 0..coors.nrows() {
                 let cc = coors.row(c);
                 let r = ele[c];
-                let r1 = (cc[0] - b[0]).powi(2) + (cc[1] - b[1]).powi(2) + (cc[2] - b[2]).powi(2);
+                let r1 = distance(&cc, &b);
                 if r1 < r {
                     result = false;
                     break;
@@ -274,7 +240,7 @@ mod tests {
 
         info!("start ....");
         let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
-        info!("done ....{:?}", d.shape());
+        info!("done ....{:?}", d);
 
         assert_eq!(456, d.shape()[0]);
     }
@@ -282,14 +248,6 @@ mod tests {
     #[test]
     fn test_ndarray() {
         crate::config::init_config();
-
-        // let a = Array::<f64, _>::zeros((3, 2).f());
-        // let b = Array::from_iter(0..10);
-
-        // let a = array![[1., 2., 3.], [4., 5., 6.]];
-
-        // let b = array!["C", "O"];
-
         let n = 1000000;
         info!("start dotsphere");
         let a = dotsphere(n);

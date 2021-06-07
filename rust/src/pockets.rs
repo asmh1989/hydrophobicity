@@ -1,4 +1,8 @@
-use std::{cmp::min, collections::HashSet, sync::Mutex};
+use std::{
+    cmp::{max, min},
+    collections::HashSet,
+    sync::Mutex,
+};
 
 use log::info;
 use ndarray::{concatenate, s, Array, ArrayView2, Axis};
@@ -6,10 +10,15 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::{config::get_vdw_vec, surface::sa_surface_core};
+use crate::{config::get_vdw_vec, surface::sa_surface_core, utils::distance};
 
 ///
 /// 网格生成
+///
+/// * `coors`: 原子集合
+/// * `n`: 格点单元距离
+/// * `buf`: 修正值
+/// * `xyz`: 坐标统计, 最大,最小以及长度
 ///
 fn gen_grid(
     coors: &ArrayView2<'_, f64>,
@@ -76,17 +85,19 @@ fn select_point(
 
     let filer = Mutex::new(Vec::<usize>::with_capacity(grid.nrows() / 4));
 
+    let ptr_2 = y_ptr.powi(2);
+
     (0..grid.nrows()).into_par_iter().for_each(|i| {
         let mut flags = true;
-        let b1 = grid.row(i);
+        let b = grid.row(i);
 
         for j in 0..coors.nrows() {
             let r = match elements {
                 Some(e) => (e[j] + y_ptr).powi(2),
-                None => y_ptr.powi(2),
+                None => ptr_2,
             };
-            let a1 = coors.row(j);
-            let r1 = (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
+            let a = coors.row(j);
+            let r1 = distance(&a, &b);
             if r1 < r {
                 flags = false;
                 break;
@@ -152,8 +163,7 @@ fn select_point2(
         // 遍历原子所在的立方体区域
         (xmin..xmax).into_par_iter().for_each(|x| {
             for y in ymin..ymax {
-                let start =
-                    std::cmp::max(start, (x * (c1 as i32) + y * (c2 as i32) + zmin) as usize);
+                let start = max(start, (x * (c1 as i32) + y * (c2 as i32) + zmin) as usize);
                 let end = min(end, (x * (c1 as i32) + y * (c2 as i32) + zmax) as usize);
                 if start > end - 1 {
                     continue;
@@ -162,12 +172,13 @@ fn select_point2(
 
                 let t = &tmp_s - &b1;
 
+                // 行为一个点, 先得出距离, 再进行判断, 筛选
                 t.mapv(|f| f * f)
                     .sum_axis(Axis(1))
                     .into_iter()
                     .enumerate()
                     .for_each(|(i, f)| {
-                        if *f < r * r {
+                        if *f < r.powi(2) {
                             let m = &mut cache.lock().unwrap();
                             m.push(start + i);
                         }
@@ -201,6 +212,14 @@ pub fn find_pockets(
     find_pockets_core(coors, &radis_v, n, pr)
 }
 
+///
+/// 找蛋白质中原子间的pocket
+///
+/// * `coors`: 原子集合
+/// * `radis_v`: 原子半径集合
+/// * `n`: 球体均分点数
+/// * `pr`: 辅助半径, 逼近pocket  
+///
 pub fn find_pockets_core(
     coors: &ArrayView2<'_, f64>,
     radis_v: &Vec<f64>,
@@ -220,13 +239,13 @@ pub fn find_pockets_core(
     info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
 
     //去除原子集合内的格点
-    let grid1 = select_point2(&coors.view(), &radis_v, &grid.view(), Some(1.4), &xyz);
-    info!("1111 shape: {:?}", grid1.shape());
+    let grid = select_point2(&coors.view(), &radis_v, &grid.view(), Some(1.4), &xyz);
+    info!("1111 shape: {:?}", grid.shape());
 
     // 获得最后的pokcets
-    let grid1 = select_point(&dot.view(), None, &grid1.view(), pr);
-    info!("2222 shape: {:?}", grid1.shape());
-    grid1
+    let grid = select_point(&dot.view(), None, &grid.view(), pr);
+    info!("2222 shape: {:?}", grid.shape());
+    grid
 }
 
 ///
@@ -250,27 +269,27 @@ pub fn label_from_grid(
     let filer = Mutex::new(vec);
     let r = pr.powi(2);
 
-    (0..grid.nrows()).into_par_iter().for_each(|i| {
-        if tmp[i] != 0. {
-            return;
-        }
-        let mut flags = false;
-        let b1 = grid.row(i);
+    (0..grid.nrows())
+        .into_par_iter()
+        .filter(|f| tmp[*f] == 0.)
+        .for_each(|i| {
+            let mut flags = false;
+            let g = grid.row(i);
 
-        for j in 0..coors.nrows() {
-            let a1 = coors.row(j);
-            let r1 = (b1[0] - a1[0]).powi(2) + (b1[1] - a1[1]).powi(2) + (b1[2] - a1[2]).powi(2);
-            if r1 < r {
-                flags = true;
-                break;
+            for j in 0..coors.nrows() {
+                let c = coors.row(j);
+                let r1 = distance(&c, &g);
+                if r1 < r {
+                    flags = true;
+                    break;
+                }
             }
-        }
 
-        if flags {
-            let n = &mut filer.lock().unwrap();
-            n[i] = label;
-        }
-    });
+            if flags {
+                let n = &mut filer.lock().unwrap();
+                n[i] = label;
+            }
+        });
 }
 
 /// layer 层级及对应label定义
@@ -301,6 +320,10 @@ pub fn find_layer(
     find_layer_core(coors, &radis_v, n, pr)
 }
 
+///
+/// 找到的pockets并分层
+///
+///
 pub fn find_layer_core(
     coors: &ArrayView2<'_, f64>,
     radis_v: &Vec<f64>,
@@ -322,7 +345,7 @@ pub fn find_layer_core(
     });
 
     let index = Array::from_shape_vec((rows, 1), vec).unwrap();
-
+    // 根据列,矩阵组合
     concatenate![Axis(1), grid, index]
 }
 
@@ -330,6 +353,8 @@ pub fn find_layer_core(
 mod tests {
     use log::info;
     use ndarray::array;
+
+    use super::*;
 
     #[test]
     fn test_grid() {
@@ -460,10 +485,10 @@ mod tests {
         // assert_eq!(23831, grid.shape()[0]);
 
         info!("start find layer");
+        let grid = find_layer(&a.view(), Some(&b), n, Some(20.));
+        info!("end find layer");
 
-        let grid = super::find_layer(&a.view(), Some(&b), n, Some(20.));
-
-        info!("layer = {:?}", grid);
+        assert_eq!(23831, grid.shape()[0]);
     }
 
     #[test]

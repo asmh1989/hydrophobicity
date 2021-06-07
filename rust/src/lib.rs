@@ -17,6 +17,7 @@ mod electrostatic;
 mod hydrophobicity;
 mod pockets;
 mod surface;
+mod utils;
 
 #[macro_export]
 macro_rules! nparray_return {
@@ -105,7 +106,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         n: usize,
         pr: f64,
     ) -> &'py PyArray2<f64> {
-        // crate::config::init_config();
+        crate::config::init_config();
         nparray_return!(
             run_hydrophobicity(&coors.as_array(), Some(&elements), &resns, n, Some(pr))
                 .into_pyarray(py)
