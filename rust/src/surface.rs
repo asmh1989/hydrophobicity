@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     f64::consts::PI,
     sync::{Mutex, RwLock},
+    usize,
 };
 
 use ndarray::{concatenate, Array, ArrayBase, ArrayView2, Axis, Dim, OwnedRepr, Slice};
@@ -67,6 +68,107 @@ pub fn dotsphere(
     Array::from_shape_vec((n, 3), data).unwrap()
 }
 
+pub struct Protein<'a> {
+    pub coors: ArrayView2<'a, f64>,
+    pub radis_v: Vec<f64>,
+    pub n: usize,
+    cache: Vec<(f64, ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>>)>,
+}
+
+pub const DEFAULT_PTR: f64 = 1.4;
+
+#[inline]
+fn get_with_index(
+    dots: &ArrayView2<'_, f64>,
+    index: bool,
+) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
+    if index {
+        dots.to_owned()
+    } else {
+        dots.slice_axis(Axis(1), Slice::from(0..3)).to_owned()
+    }
+}
+
+impl<'a> Protein<'a> {
+    pub fn new(coors: ArrayView2<'a, f64>, elements: Option<&Vec<&str>>, n: usize) -> Self {
+        // 求得原子半径集合缓存, 下面多个方法需要使用
+        let mut radis_v = vec![0.; coors.nrows()];
+        get_vdw_vec(elements, &mut radis_v);
+
+        let data = sa_surface_core(&coors, &radis_v, n, Some(DEFAULT_PTR), true);
+        let mut cache = vec![];
+        cache.push((DEFAULT_PTR, data));
+        Self {
+            coors,
+            radis_v,
+            n,
+            cache,
+        }
+    }
+
+    ///
+    /// 计算当前蛋白质的sa平面集合
+    ///
+    pub fn sa_surface(
+        &mut self,
+        pr: f64,
+        index: bool,
+    ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
+        let mut i = 0;
+        for (k, v) in &self.cache {
+            if *k == pr {
+                return get_with_index(&v.view(), index);
+            } else if *k < pr {
+                break;
+            } else {
+                i += 1;
+            }
+        }
+
+        // 未发现缓存
+        if i == 0 {
+            let data = sa_surface_core(&self.coors, &self.radis_v, self.n, Some(pr), true);
+            self.cache.insert(i, (pr, data.clone()));
+            return get_with_index(&data.view(), index);
+        } else {
+            let prev = self.cache[min(self.cache.len() - 1, i)].clone();
+            let data = sa_surface_from_prev(
+                &self.coors,
+                &prev.1.view(),
+                &self.radis_v,
+                self.n,
+                prev.0,
+                pr,
+                index,
+            );
+            self.cache
+                .insert(min(self.cache.len(), i), (pr, data.clone()));
+            return get_with_index(&data.view(), index);
+        }
+    }
+
+    ///
+    /// 计算`pr` 对应结果中, 均分点在每个原子下的百分比
+    ///
+    pub fn get_index_map_by_ptr(&mut self, pr: f64) -> HashMap<usize, f64> {
+        let tmp = self.sa_surface(pr, true);
+        let sa = Mutex::new(HashMap::<usize, f64>::new());
+
+        (0..self.coors.nrows()).into_par_iter().for_each(|f| {
+            let count = tmp
+                .axis_iter(Axis(0))
+                .filter(|r| (r[3] as usize) == f)
+                .count();
+
+            let n = &mut sa.lock().unwrap();
+            n.insert(f, count as f64 / self.n as f64);
+        });
+
+        let m = sa.lock().unwrap().to_owned();
+        m
+    }
+}
+
 ///
 /// 去除球体重叠部分
 /// * `coors` : 原子坐标集合
@@ -93,7 +195,7 @@ pub fn sa_surface(
 ///
 /// 求蛋白质sa平面点集合
 ///
-pub fn sa_surface_core(
+fn sa_surface_core(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
     n: usize,
@@ -159,15 +261,29 @@ pub fn sa_surface_core(
     Array::from_shape_vec((ddd.len() / col, col), ddd).unwrap()
 }
 
-pub fn sa_surface_from_prev(
+///
+/// 利用缓存数据,计算蛋白质sa平面点集合
+///
+/// `coors`: 蛋白质原子集合
+/// `prev_dots`: `prev_ptr`计算的缓存结果
+/// `elements`: 原子半径集合
+/// `prev_ptr`: 缓存结果的对应的辅助半径
+/// `y_ptr`: 要计算的新半径
+/// `n`: 均分点数
+/// `index`: 是否包含原子索引
+///
+fn sa_surface_from_prev(
     coors: &ArrayView2<'_, f64>,
     prev_dots: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
     n: usize,
     prev_ptr: f64,
     y_ptr: f64,
+    index: bool,
 ) -> ArrayBase<OwnedRepr<f64>, Dim<[usize; 2]>> {
     let dd = Mutex::new(Vec::<f64>::new());
+
+    let col = if index { 4 } else { 3 };
 
     // 缓存半径计算
     let ele = elements
@@ -223,70 +339,23 @@ pub fn sa_surface_from_prev(
 
         let u = ball2.select(Axis(0), &filer.lock().unwrap());
 
-        dd.lock().unwrap().extend(u.iter().map(|f| *f));
+        if u.nrows() == 0 {
+            return;
+        }
+
+        let data = if index {
+            let four = Array::from_shape_fn((u.nrows(), 1), |(_, _)| i as f64);
+            concatenate![Axis(1), u, four]
+        } else {
+            u
+        };
+
+        dd.lock().unwrap().extend(data.iter().map(|f| *f));
     });
 
     let ddd = dd.lock().unwrap().to_owned();
 
-    Array::from_shape_vec((ddd.len() / 3, 3), ddd).unwrap()
-}
-
-///
-/// 求蛋白质sa平面点集合, 返回字典数据, 对应每个原子上的返回点个数百分比
-///
-pub fn sa_surface_return_map(
-    coors: &ArrayView2<'_, f64>,
-    elements: &Vec<f64>,
-    n: usize,
-    pr: Option<f64>,
-) -> HashMap<usize, f64> {
-    let ball = dotsphere(n);
-
-    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-
-    let dd = Mutex::new(HashMap::<usize, f64>::new());
-
-    // 缓存半径计算
-    let ele = elements
-        .into_par_iter()
-        .map(|f| (*f + y_ptr).powi(2) - 1e-6)
-        .collect::<Vec<f64>>();
-
-    // 遍历原子集合
-    (0..coors.nrows()).into_par_iter().for_each(|i| {
-        let r = elements[i] + y_ptr;
-
-        // 生成该原子上的均等分点
-        let ball2 = ball.mapv(|b| b * r) + coors.row(i);
-
-        let filer = Mutex::new(0);
-
-        // 遍历这些点, 开始刷选在其余原子半径内的点
-        (0..n).into_par_iter().for_each(|j| {
-            let mut result = true;
-            let b = ball2.row(j);
-            for c in 0..coors.nrows() {
-                let cc = coors.row(c);
-                let r = ele[c];
-                let r1 = distance(&cc, &b);
-                if r1 < r {
-                    result = false;
-                    break;
-                }
-            }
-            // 不在半径内即为重叠部分, 选中
-            if result {
-                *filer.lock().unwrap() += 1;
-            }
-        });
-
-        let pecent = filer.lock().unwrap().to_owned() as f64 / n as f64;
-
-        dd.lock().unwrap().insert(i, pecent);
-    });
-
-    let m = dd.lock().unwrap().to_owned();
-    m
+    Array::from_shape_vec((ddd.len() / col, col), ddd).unwrap()
 }
 
 #[cfg(test)]
@@ -303,30 +372,39 @@ mod tests {
         let a = array![[0., 0., 0.], [0., 0., 1.7], [0., 0., 10.7]];
 
         let b = vec!["C", "O", "CD1"];
-        let n = 10;
+        let n = 1000;
+
+        let mut p = Protein::new(a.view(), Some(&b), n);
 
         info!("start ....");
-        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
+        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(DEFAULT_PTR), true);
         info!("done ....{:?}", d.shape());
 
-        let mut radis_v = vec![0.; a.nrows()];
-        get_vdw_vec(Some(&b), &mut radis_v);
+        info!("start form prev....");
+        let d = p.sa_surface(2.8, false);
+        info!("done form prev ....{:?}", d.shape());
 
         info!("start form prev....");
-        let d = sa_surface_from_prev(&a.view(), &d.view(), &radis_v, n, 1.4, 2.8);
-        info!("done form prev ....{:?}", d);
+        let d = p.sa_surface(3.4, false);
+        info!("done form prev ....{:?}", d.shape());
+
+        info!("start form prev....");
+        let d = p.sa_surface(6.8, false);
+        info!("done form prev ....{:?}", d.shape());
+
+        info!("start form prev....");
+        let d = p.sa_surface(1.0, false);
+        info!("done form prev ....{:?}", d.shape());
+
+        info!("start form prev....");
+        let d = p.sa_surface(10.8, false);
+        info!("done form prev ....{:?}", d.shape());
 
         info!("start ....");
-        let d = sa_surface(&a.view(), Some(&b), Some(n), Some(2.8), false);
-        info!("done ....{:?}", d);
+        let d1 = sa_surface(&a.view(), Some(&b), Some(n), Some(10.8), false);
+        info!("done ....{:?}", d1.shape());
 
-        // let n = 200;
-
-        // info!("start ....");
-        // let d = sa_surface(&a.view(), Some(&b), Some(n), Some(1.4), true);
-        // info!("done ....{:?}", d);
-
-        // assert_eq!(456, d.shape()[0]);
+        assert_eq!(d1.shape()[0], d.shape()[0]);
     }
 
     #[test]

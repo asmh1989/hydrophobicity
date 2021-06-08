@@ -5,9 +5,9 @@ use ndarray::{concatenate, Array, ArrayView1, ArrayView2, Axis};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    config::{get_hdp_vec, get_vdw_vec},
+    config::get_hdp_vec,
     pockets::find_layer_core,
-    surface::sa_surface_return_map,
+    surface::{Protein, DEFAULT_PTR},
     utils::distance,
 };
 
@@ -24,19 +24,17 @@ pub fn run_hydrophobicity(
     elements: Option<&Vec<&str>>,
     resns: &Vec<&str>,
     n: usize,
-    pr: Option<f64>,
+    pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    // 求得原子半径集合缓存, 下面多个方法需要使用
-    let mut radis_v = vec![0.; coors.nrows()];
-    get_vdw_vec(elements, &mut radis_v);
+    let mut protein = Protein::new(coors.clone(), elements, n);
 
     // atom_resn ==> hdp
     let mut hdp_v = vec![0.; coors.len()];
     get_hdp_vec(elements, resns, &mut hdp_v);
 
-    let layer_grid = find_layer_core(coors, &radis_v, n, pr);
+    let layer_grid = find_layer_core(&mut protein, pr);
 
-    let sa = sa_surface_return_map(coors, &radis_v, n, None);
+    let sa = protein.get_index_map_by_ptr(DEFAULT_PTR);
 
     let (pocket, layer) = layer_grid.view().split_at(Axis(1), 3);
 
@@ -50,7 +48,7 @@ pub fn run_hydrophobicity(
     // 计算每一个pocket点的疏水性
     (0..layer_len).into_par_iter().for_each(|i| {
         let grid = pocket.row(i);
-        let atom_h = cal_atom_hydro(&grid, coors, &radis_v, &hdp_v, &sa);
+        let atom_h = cal_atom_hydro(&grid, coors, &protein.radis_v, &hdp_v, &sa);
         let water_h = cal_water_hydro(&grid, &pocket.view(), &label);
         let all = (atom_h + water_h) / 10.;
         let n = &mut atom_hdp_v.lock().unwrap();
@@ -71,7 +69,6 @@ const HPD_I: f64 = 81.01;
 /// 根据距离进行`filer`
 ///
 /// 返回(index, dis)
-///
 ///
 fn filer_point(a: &ArrayView1<'_, f64>, b: &ArrayView1<'_, f64>, i: usize) -> Option<(usize, f64)> {
     let sum = distance(a, b);
@@ -104,8 +101,8 @@ fn cal_atom_hydro(
             let i = v.0;
             let r = radis_v[i];
             let hdp = hdp_v[i];
-            let a = 4. * PI * (r + 1.4).powi(2) * sa_m.get(&i).unwrap();
-            let dis = v.1 - r - 1.4;
+            let a = 4. * PI * (r + DEFAULT_PTR).powi(2) * sa_m.get(&i).unwrap();
+            let dis = v.1 - r - DEFAULT_PTR;
             let hydro_atom = hdp * a * (-0.7 * dis).exp();
             hydro_atom
         })
@@ -322,7 +319,7 @@ mod tests {
             (a.len(), b.len(), c.len())
         );
 
-        let grid = run_hydrophobicity(&a.view(), Some(&b), &c, n, Some(20.));
+        let grid = run_hydrophobicity(&a.view(), Some(&b), &c, n, 20.);
 
         info!("layer = {:?}", grid);
     }

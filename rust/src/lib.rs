@@ -80,9 +80,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         pr: f64,
     ) -> &'py PyArray2<f64> {
         // crate::config::init_config();
-        nparray_return!(
-            find_pockets(&coors.as_array(), Some(&elements), n, Some(pr)).into_pyarray(py)
-        )
+        nparray_return!(find_pockets(&coors.as_array(), Some(&elements), n, pr).into_pyarray(py))
     }
 
     #[pyfn(m, "find_layer")]
@@ -94,7 +92,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         pr: f64,
     ) -> &'py PyArray2<f64> {
         // crate::config::init_config();
-        nparray_return!(find_layer(&coors.as_array(), Some(&elements), n, Some(pr)).into_pyarray(py))
+        nparray_return!(find_layer(&coors.as_array(), Some(&elements), n, pr).into_pyarray(py))
     }
 
     #[pyfn(m, "run_hydrophobicity")]
@@ -108,8 +106,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     ) -> &'py PyArray2<f64> {
         crate::config::init_config();
         nparray_return!(
-            run_hydrophobicity(&coors.as_array(), Some(&elements), &resns, n, Some(pr))
-                .into_pyarray(py)
+            run_hydrophobicity(&coors.as_array(), Some(&elements), &resns, n, pr).into_pyarray(py)
         )
     }
 

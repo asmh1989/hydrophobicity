@@ -11,8 +11,7 @@ use rayon::iter::{
 };
 
 use crate::{
-    config::get_vdw_vec,
-    surface::{sa_surface_core, sa_surface_from_prev},
+    surface::{Protein, DEFAULT_PTR},
     utils::distance,
 };
 
@@ -83,10 +82,8 @@ fn select_point(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<f64>>,
     grid: &ArrayView2<'_, f64>,
-    pr: Option<f64>,
+    y_ptr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-
     let filer = Mutex::new(Vec::<usize>::with_capacity(grid.nrows() / 4));
 
     let ptr_2 = y_ptr.powi(2);
@@ -121,11 +118,9 @@ fn select_point2(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
     grid: &ArrayView2<'_, f64>,
-    pr: Option<f64>,
+    y_ptr: f64,
     xyz: &[f64],
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    let y_ptr = if pr.is_none() { 1.4f64 } else { pr.unwrap() };
-
     let tmp = grid;
 
     let row = grid.nrows();
@@ -207,13 +202,10 @@ pub fn find_pockets(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
     n: usize,
-    pr: Option<f64>,
+    pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    // 求得原子半径集合缓存, 下面多个方法需要使用
-    let mut radis_v = vec![0.; coors.nrows()];
-    get_vdw_vec(elements, &mut radis_v);
-
-    find_pockets_core(coors, &radis_v, n, pr)
+    let mut protein = Protein::new(coors.clone(), elements, n);
+    find_pockets_core(&mut protein, pr)
 }
 
 ///
@@ -225,25 +217,29 @@ pub fn find_pockets(
 /// * `pr`: 辅助半径, 逼近pocket  
 ///
 pub fn find_pockets_core(
-    coors: &ArrayView2<'_, f64>,
-    radis_v: &Vec<f64>,
-    n: usize,
-    pr: Option<f64>,
+    protein: &mut Protein,
+    pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let mut xyz = [0.; 9];
 
     // 辅助sa surface
-    let dot = sa_surface_core(&coors.view(), &radis_v, n, pr, false);
+    let dot = protein.sa_surface(pr, false);
 
     info!("shape: {:?}", dot.shape());
 
     // 生成网格
-    let grid = gen_grid(&coors.view(), 1, 0., &mut xyz);
+    let grid = gen_grid(&protein.coors, 1, 0., &mut xyz);
 
     info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
 
     //去除原子集合内的格点
-    let grid = select_point2(&coors.view(), &radis_v, &grid.view(), Some(1.4), &xyz);
+    let grid = select_point2(
+        &protein.coors,
+        &protein.radis_v,
+        &grid.view(),
+        DEFAULT_PTR,
+        &xyz,
+    );
     info!("1111 shape: {:?}", grid.shape());
 
     // 获得最后的pokcets
@@ -315,13 +311,10 @@ pub fn find_layer(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
     n: usize,
-    pr: Option<f64>,
+    pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    // 求得原子半径集合缓存, 下面多个方法需要使用
-    let mut radis_v = vec![0.; coors.nrows()];
-    get_vdw_vec(elements, &mut radis_v);
-
-    find_layer_core(coors, &radis_v, n, pr)
+    let mut protein = Protein::new(coors.clone(), elements, n);
+    find_layer_core(&mut protein, pr)
 }
 
 ///
@@ -329,23 +322,19 @@ pub fn find_layer(
 ///
 ///
 pub fn find_layer_core(
-    coors: &ArrayView2<'_, f64>,
-    radis_v: &Vec<f64>,
-    n: usize,
-    pr: Option<f64>,
+    protein: &mut Protein,
+    pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    let grid = find_pockets_core(coors, &radis_v, n, pr);
+    let grid = find_pockets_core(protein, pr);
 
     let rows = grid.nrows();
 
     let mut vec = vec![0.; rows];
 
-    let help_dot = sa_surface_core(coors, &radis_v, n, None, true);
-
     // 根据指定的分层逻辑,开始遍历分层
     PROBE_RADIIS.iter().for_each(|f| {
         // info!("start sa_surface_core pr={}", f.0);
-        let dots = sa_surface_from_prev(coors, &help_dot.view(), &radis_v, n, 1.4, f.0);
+        let dots = protein.sa_surface(f.0, false);
         // info!("end sa_surface_core pr={}", f.0);
         label_from_grid(&grid.view(), &dots.view(), f.1 as f64, &mut vec, f.0);
     });
@@ -491,7 +480,7 @@ mod tests {
         // assert_eq!(23831, grid.shape()[0]);
 
         info!("start find layer");
-        let grid = find_layer(&a.view(), Some(&b), n, Some(20.));
+        let grid = find_layer(&a.view(), Some(&b), n, 20.);
         info!("end find layer");
 
         assert_eq!(23831, grid.shape()[0]);
