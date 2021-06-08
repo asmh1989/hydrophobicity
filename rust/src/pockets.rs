@@ -10,7 +10,11 @@ use rayon::iter::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
 };
 
-use crate::{config::get_vdw_vec, surface::sa_surface_core, utils::distance};
+use crate::{
+    config::get_vdw_vec,
+    surface::{sa_surface_core, sa_surface_from_prev},
+    utils::distance,
+};
 
 ///
 /// 网格生成
@@ -336,10 +340,12 @@ pub fn find_layer_core(
 
     let mut vec = vec![0.; rows];
 
+    let help_dot = sa_surface_core(coors, &radis_v, n, None, true);
+
     // 根据指定的分层逻辑,开始遍历分层
     PROBE_RADIIS.iter().for_each(|f| {
         // info!("start sa_surface_core pr={}", f.0);
-        let dots = sa_surface_core(coors, &radis_v, n, Some(f.0), false);
+        let dots = sa_surface_from_prev(coors, &help_dot.view(), &radis_v, n, 1.4, f.0);
         // info!("end sa_surface_core pr={}", f.0);
         label_from_grid(&grid.view(), &dots.view(), f.1 as f64, &mut vec, f.0);
     });
