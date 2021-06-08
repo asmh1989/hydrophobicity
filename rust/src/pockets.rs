@@ -71,13 +71,14 @@ fn gen_grid(
 }
 
 ///
-/// 从网格grid中去除原子集合内的点
+/// 画园法,截取网格点
 /// * `coors`: 原子集合
 /// * `elements`: 原子半径集合
-/// * `grid`: 网格, 包含所有原子集合的立方体网格
-/// * `pr`: 半径补充
+/// * `grid`: 网格点集合
+/// * `pr`: 辅助圆半径
 ///  
 /// 返回过滤后的`grid`
+///
 fn select_point(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<f64>>,
@@ -114,11 +115,21 @@ fn select_point(
     d
 }
 
+///
+/// 从网格grid中去除原子集合内的点, 方式是先获取起始点, 减少判定次数
+/// * `coors`: 原子集合
+/// * `elements`: 原子半径集合
+/// * `grid`: 网格, 包含所有原子集合的立方体网格
+/// * `pr`: 探测小球半径 一般1.4
+/// * `xyz`: `grid` 状态相关数据集合
+///  
+/// 返回过滤后的`grid`
+///
 fn select_point2(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
     grid: &ArrayView2<'_, f64>,
-    y_ptr: f64,
+    pr: f64,
     xyz: &[f64],
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let tmp = grid;
@@ -129,7 +140,7 @@ fn select_point2(
 
     (0..coors.nrows()).into_par_iter().for_each(|i| {
         let b1 = coors.row(i);
-        let r = elements[i] + y_ptr;
+        let r = elements[i] + pr;
 
         // 立方体左上角最小的点
         let (x1, y1, z1) = (b1[0] - r - xyz[0], b1[1] - r - xyz[3], b1[2] - r - xyz[6]);
@@ -242,7 +253,7 @@ pub fn find_pockets_core(
     );
     info!("1111 shape: {:?}", grid.shape());
 
-    // 获得最后的pokcets
+    // 外部画圆(pr 选择为 20)的方式截取的方式获得最后的pokcets
     let grid = select_point(&dot.view(), None, &grid.view(), pr);
     info!("2222 shape: {:?}", grid.shape());
     grid
