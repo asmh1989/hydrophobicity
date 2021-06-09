@@ -8,14 +8,14 @@ use pyo3::prelude::{pymodule, PyModule, PyResult, Python};
 use crate::{
     electrostatic::cal_electro,
     hydrophobicity::run_hydrophobicity,
-    pockets::{find_layer, find_pockets},
+    pocket::{find_layer, find_pocket},
     surface::sa_surface,
 };
 
 mod config;
 mod electrostatic;
 mod hydrophobicity;
-mod pockets;
+mod pocket;
 mod surface;
 mod utils;
 
@@ -80,7 +80,7 @@ pub fn sz_py_ext(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
         pr: f64,
     ) -> &'py PyArray2<f64> {
         // crate::config::init_config();
-        nparray_return!(find_pockets(&coors.as_array(), Some(&elements), n, pr).into_pyarray(py))
+        nparray_return!(find_pocket(&coors.as_array(), Some(&elements), n, pr).into_pyarray(py))
     }
 
     #[pyfn(m, "find_layer")]
