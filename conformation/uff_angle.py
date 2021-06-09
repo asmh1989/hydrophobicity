@@ -229,11 +229,3 @@ def get_angles_energy_grad(coors, eles):
         grad[atom_k] += tmp[3]
     return (E, grad)
 
-
-def optimization_SD(coors, eles, maxIter=100):
-    pos = coors
-    for i in range(maxIter):
-        E, G = get_angles_energy_grad(pos, eles)
-        pos = pos - (0.0001 * G)
-        print("E = {:6.2f}\n".format(E), "G = {}".format(G.round(2)))
-    return pos

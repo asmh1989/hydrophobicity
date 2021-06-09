@@ -70,5 +70,29 @@ def to_xyz(data, ele="H", filename="test.xyz"):
     mkdir_by_file(filename)
 
     t = pd.DataFrame(data)
+    n_atom = int(t.shape[0])
     t.insert(0, "atom", ele)
-    t.to_csv(filename, header=None, index=None, sep=" ")
+    df1 = pd.DataFrame(
+        [[n_atom, "", "", ""], [filename, "", "", ""]],
+        columns=["atom", 0, 1, 2],
+    )
+    res = pd.concat([df1, t])
+    res.to_csv(filename, header=None, index=None, sep="\t")
+
+
+def xyz2trj(datalist, ele="H", filename="test.xyz"):
+    res = []
+    mkdir_by_file(filename)
+    for data in datalist:
+        t = pd.DataFrame(data)
+        n_atom = int(t.shape[0])
+        t.insert(0, "atom", ele)
+        df1 = pd.DataFrame(
+            [[n_atom, "", "", ""], [filename, "", "", ""]],
+            columns=["atom", 0, 1, 2],
+        )
+        df2 = pd.concat([df1, t])
+        res.append(df2)
+    res = pd.concat(res)
+    res.to_csv(filename, header=None, index=None, sep="\t")
+

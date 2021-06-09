@@ -13,16 +13,17 @@ Created on Wed May 12 09:01:49 2021
 @author: likun.yang
 """
 import os
+
 import numpy as np
 import pandas as pd
+
 # from rdkit import Chem
 
-uff_par_path = '/home/yanglikun/git/protein/conformation/data/uff.par'
+uff_par_path = "/home/yanglikun/git/protein/conformation/data/uff.par"
 
-uff_par = pd.read_csv(uff_par_path, sep='\s+',
-                      skiprows=148)  # load the uff par
+uff_par = pd.read_csv(uff_par_path, sep="\s+", skiprows=148)  # load the uff par
 
-'''
+"""
 par meaning
 took from rdkit
 
@@ -37,10 +38,10 @@ took from rdkit
     GMP_Xi;        //!< GMP Electronegativity;
     GMP_Hardness;  //!< GMP Hardness
     GMP_Radius;    //!< GMP Radius value
-'''
+"""
 
-covalent_radii = {'H': 0.23, 'C': 0.68, 'O': 0.68, 'N': 0.68}
-'''
+covalent_radii = {"H": 0.23, "C": 0.68, "O": 0.68, "N": 0.68}
+"""
 2021-5-31 Likun.Yang
 # covalent radii
 # ref: rdkit Chem.GetPeriodicTable().GetRcovalent()
@@ -49,11 +50,11 @@ Need Optimazation !!!
 based on bond order !!!
 one data source maybe in
 "https://chem.libretexts.org/Ancillary_Materials/Reference/Reference_Tables/Atomic_and_Molecular_Properties/A3%3A_Covalent_Radii"
-'''
+"""
 
 
-def read_xyz(filename, dir='.'):
-    '''
+def read_xyz(filename, dir="."):
+    """
     xyz format
     3 #numer of atoms
       # blank line
@@ -62,30 +63,30 @@ def read_xyz(filename, dir='.'):
     H 0 0 4
 
     return coor,elements #in numpy array
-    '''
+    """
     file_path = os.path.join(dir, filename)
-    df = pd.read_csv(file_path, header=None, sep='\s+', skiprows=2)
+    df = pd.read_csv(file_path, header=None, sep="\s+", skiprows=2)
     coors = df.iloc[:, 1:].values
-    eles = df.iloc[:, 0].values.astype('str')
+    eles = df.iloc[:, 0].values.astype("str")
     eles = np.char.upper(eles)  # convert to uppercase
     return (coors, eles)
 
 
 def get_distance(a, b):
-    '''
+    """
     return distance between point a,b
-    '''
-    return np.sqrt(np.sum(np.square(a-b)))
+    """
+    return np.sqrt(np.sum(np.square(a - b)))
 
 
 def get_distance_matrix(coors):
-    '''
+    """
     input: numpy array atoms coors xyz
     return: distance matrix
-    '''
+    """
     res = np.zeros((len(coors), len(coors)))
     for i in range(len(coors)):
-        for j in range(i+1, len(coors)):
+        for j in range(i + 1, len(coors)):
             d = get_distance(coors[i], coors[j])
             res[i, j] = d
             res[j, i] = d
@@ -114,7 +115,7 @@ def get_AC(coors, eles, distance_matrix, covalent_factor=1.3):
     """
 
     # Calculate distance matrix
-    #dMat = get_distance_matrix(coors)
+    # dMat = get_distance_matrix(coors)
     num_atoms = coors.shape[0]
     AC = np.zeros((num_atoms, num_atoms), dtype=int)
     for i in range(num_atoms):
@@ -131,7 +132,7 @@ def get_AC(coors, eles, distance_matrix, covalent_factor=1.3):
 
 
 def get_bond_order():
-    '''
+    """
     set default value as 1, for simplicity
 
     Need Change after !!!
@@ -140,12 +141,12 @@ def get_bond_order():
 
     Note: 1.42 for aminoacid
 
-    '''
+    """
     return 1
 
 
 def get_atom_type(atom):
-    '''
+    """
     Just for simplicity
     very crude
     Need Change after
@@ -154,28 +155,28 @@ def get_atom_type(atom):
     note: maybe rdkit atom.GetHybridization()??? Need test!
     2021-5-28
     likun.yang
-    '''
+    """
     atom = atom.upper()
-    if atom == 'H':
-        return 'H_'
-    elif atom == 'C':
-        return 'C_3'
-    elif atom == 'O':
-        return 'O_3'
-    elif atom == 'N':
-        return 'N_3'
+    if atom == "H":
+        return "H_"
+    elif atom == "C":
+        return "C_3"
+    elif atom == "O":
+        return "O_3"
+    elif atom == "N":
+        return "N_3"
     else:
-        raise KeyError('Not Support Atom Type')
+        raise KeyError("Not Support Atom Type")
 
 
 def get_uff_par(atom_type, term):
-    return uff_par[term][uff_par['Atom'] == atom_type].values[0]
+    return uff_par[term][uff_par["Atom"] == atom_type].values[0]
 
 
 def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
-    '''
+    """
     E_bond = 1/2 * force_cons * (r_curr - r_optima)^2
-    '''
+    """
     atom_i = bond[0]
     atom_j = bond[1]
     atom_type_i = get_atom_type(elemets[atom_i])
@@ -183,11 +184,11 @@ def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
 
     r_curr = distance_matrix[atom_i, atom_j]
     r_desired = cal_real_bond_length(bond_order, atom_type_i, atom_type_j)
-    print('R_desired = {}'.format(r_desired))
+    print("R_desired = {}".format(r_desired))
     force_cons = cal_bond_force_cons(atom_type_i, atom_type_j, r_desired)
-    print('Force Constant = {:6.2f}'.format(force_cons))
+    print("Force Constant = {:6.2f}".format(force_cons))
     E_bond = 0.5 * force_cons * (r_curr - r_desired) ** 2
-    print('Ebond = {:6.2f}'.format(E_bond))
+    print("Ebond = {:6.2f}".format(E_bond))
 
     u_vec = (coors[atom_i] - coors[atom_j]) / r_curr
     G_bond = force_cons * (r_curr - r_desired) * u_vec
@@ -195,33 +196,37 @@ def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
 
 
 def cal_real_bond_length(bondorder, atom_type_i, atom_type_j):
-    '''
+    """
     return real ideal bond length
     r_ij = r_i + r_j + r_bo - r_en #
-    '''
+    """
 
-    r1_i = get_uff_par(atom_type_i, 'r1')
-    r1_j = get_uff_par(atom_type_j, 'r1')
-    Xi_i = get_uff_par(atom_type_i, 'Xi')
-    Xi_j = get_uff_par(atom_type_j, 'Xi')
+    r1_i = get_uff_par(atom_type_i, "r1")
+    r1_j = get_uff_par(atom_type_j, "r1")
+    Xi_i = get_uff_par(atom_type_i, "Xi")
+    Xi_j = get_uff_par(atom_type_j, "Xi")
 
     # this is the pauling correction
     r_bo = -0.1332 * (r1_i + r1_j) * np.log(bondorder)
 
     # O'Keefe and Breese electronegativity correction
-    r_en = r1_i * r1_j * (np.sqrt(Xi_i) - np.sqrt(Xi_j)
-                          ) ** 2 / (Xi_i * r1_i + Xi_j * r1_j)
+    r_en = (
+        r1_i
+        * r1_j
+        * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2
+        / (Xi_i * r1_i + Xi_j * r1_j)
+    )
 
     res = r1_i + r1_j + r_bo - r_en
     return res
 
 
 def cal_bond_force_cons(atom_type_i, atom_type_j, r_ij_desired):
-    Z1_i = get_uff_par(atom_type_i, 'Z1')
-    Z1_j = get_uff_par(atom_type_j, 'Z1')
+    Z1_i = get_uff_par(atom_type_i, "Z1")
+    Z1_j = get_uff_par(atom_type_j, "Z1")
 
     G = 332.06  # bond force constant prefactor
-    res = 2.0 * G * Z1_i * Z1_j / r_ij_desired**3
+    res = 2.0 * G * Z1_i * Z1_j / r_ij_desired ** 3
     return res
 
 
@@ -229,7 +234,7 @@ def get_bond_list(adjacent_matrix):
     bond_list = []
     shape = adjacent_matrix.shape[0]
     for i in range(shape):
-        for j in range(i+1, shape):
+        for j in range(i + 1, shape):
             if adjacent_matrix[i, j] == 1:
                 bond_list.append((i, j))
     return bond_list
@@ -245,8 +250,9 @@ def get_bonds_energy_grad(coors, elemets):
     for bond in bond_list:
         atom_i = bond[0]
         atom_j = bond[1]
-        tmp = cal_bond_energy_and_grad(bond, bond_order,
-                                       coors, elemets, distance_matrix)
+        tmp = cal_bond_energy_and_grad(
+            bond, bond_order, coors, elemets, distance_matrix
+        )
         E += tmp[0]
         G = tmp[1]
         grad[atom_i] += G
@@ -259,5 +265,5 @@ def optimization_SD(coors, eles, maxIter=50):
     for i in range(maxIter):
         E, G = get_bonds_energy_grad(pos, eles)
         pos = pos - (0.001 * G)
-        print('E = {:6.2f}\n'.format(E), 'G = {}'.format(G.round(2)))
+        print("E = {:6.2f}\n".format(E), "G = {}".format(G.round(2)))
     return pos
