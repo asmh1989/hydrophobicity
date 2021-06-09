@@ -81,7 +81,6 @@ fn gen_grid(
 ///
 fn select_point(
     coors: &ArrayView2<'_, f64>,
-    elements: Option<&Vec<f64>>,
     grid: &ArrayView2<'_, f64>,
     y_ptr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
@@ -94,13 +93,9 @@ fn select_point(
         let b = grid.row(i);
 
         for j in 0..coors.nrows() {
-            let r = match elements {
-                Some(e) => (e[j] + y_ptr).powi(2),
-                None => ptr_2,
-            };
             let a = coors.row(j);
             let r1 = distance(&a, &b);
-            if r1 < r {
+            if r1 < ptr_2 {
                 flags = false;
                 break;
             }
@@ -125,7 +120,7 @@ fn select_point(
 ///  
 /// 返回过滤后的`grid`
 ///
-fn select_point2(
+fn select_point_by_atomic(
     coors: &ArrayView2<'_, f64>,
     elements: &Vec<f64>,
     grid: &ArrayView2<'_, f64>,
@@ -244,7 +239,7 @@ pub fn find_pockets_core(
     info!("shape: {:?} xyz = {:?}", grid.shape(), xyz);
 
     //去除原子集合内的格点
-    let grid = select_point2(
+    let grid = select_point_by_atomic(
         &protein.coors,
         &protein.radis_v,
         &grid.view(),
@@ -254,7 +249,7 @@ pub fn find_pockets_core(
     info!("1111 shape: {:?}", grid.shape());
 
     // 外部画圆(pr 选择为 20)的方式截取的方式获得最后的pokcets
-    let grid = select_point(&dot.view(), None, &grid.view(), pr);
+    let grid = select_point(&dot.view(), &grid.view(), pr);
     info!("2222 shape: {:?}", grid.shape());
     grid
 }
