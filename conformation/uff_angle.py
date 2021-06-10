@@ -9,7 +9,7 @@ return energy and gradient
 """
 import numpy as np
 
-from conformation.uff_bond import *
+from uff_bond import *
 
 
 def get_bonds_v2(coors, eles):

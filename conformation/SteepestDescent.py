@@ -6,9 +6,11 @@ SteepestDescent optimzer
 @Date     :2021/06/07 14:23:13
 @Author      :likun.yang
 """
+import copy
+
 import numpy as np
 
-from conformation.uff_nonBonded import *
+from uff_nonBonded import *
 
 
 def test_f(x):
@@ -33,34 +35,47 @@ def IsNear(a, b, epsilon):
     return np.abs(a - b) < epsilon
 
 
-import copy
+def normalizeGrad(grad):
+    """
+    project grad to [-1,1]
+
+    grad = grad - grad.mean(axis=0) / grad.max(axis=0) - grad.min(axis=0)
+   
+    """
+    a = grad - grad.mean(axis=0)
+    b = grad.max(axis=0) - grad.min(axis=0)
+    c = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    return c
 
 
 def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
-    currrent_pos = copy.deepcopy(coors)
+    currrent_pos = coors.astype("float64")
     step = 0.2
     trustRadius = 0.75
     counter = 0
     trj = []
+    energy = []
     for _ in range(maxIter):
         counter += 1
         Energy, grad = func(currrent_pos, eles)
-        print("energy= {:6.2f}".format(Energy))
-        # print("grandient= \n{}".format(grad.round(2)))
+        energy.append(Energy)
+        grad = normalizeGrad(grad)
+        # print("energy= {:6.2f}".format(Energy))
+        print("grandient= \n{}".format(grad.round(2)))
         tempStep = -grad * step
         newStep = np.where(
             tempStep > trustRadius, trustRadius, tempStep
         )  # positive big step
         newStep = np.where(
             newStep < -trustRadius, -trustRadius, newStep
-        )  # negative big step
+        )  # negative big step4
         if np.all(np.abs(newStep) < torerance):
             break
         currrent_pos += newStep
         # print(currrent_pos)
         trj.append(np.array(currrent_pos))  # deep copy
         print(counter)
-    return (currrent_pos, trj)
+    return (currrent_pos, trj, np.array(energy))
     # # print(newStep)
     #
 
