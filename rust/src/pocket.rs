@@ -204,14 +204,14 @@ fn select_point_by_atomic(
     tmp.select(Axis(0), &d)
 }
 
-pub fn find_pockets(
+pub fn find_pocket(
     coors: &ArrayView2<'_, f64>,
     elements: Option<&Vec<&str>>,
     n: usize,
     pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
     let mut protein = Protein::new(coors.clone(), elements, n);
-    find_pockets_core(&mut protein, pr)
+    find_pocket_core(&mut protein, pr)
 }
 
 ///
@@ -222,7 +222,7 @@ pub fn find_pockets(
 /// * `n`: 球体均分点数
 /// * `pr`: 辅助半径, 逼近pocket  
 ///
-pub fn find_pockets_core(
+pub fn find_pocket_core(
     protein: &mut Protein,
     pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
@@ -255,9 +255,9 @@ pub fn find_pockets_core(
 }
 
 ///
-/// 给pockets集合,进行分层标记
+/// 给pocket集合,进行分层标记
 ///
-/// * `grid`: `Pockets`集合
+/// * `grid`: `pocket`格点集合
 /// * `coors`: 标记辅助集合点, 还是用距离算法
 /// * `label`: 当前标记值
 /// * `vec`: 原子半径集合
@@ -311,7 +311,7 @@ const PROBE_RADIIS: [(f64, i32); 8] = [
 ];
 
 ///
-/// 给找到的pockets分层
+/// 给找到的pocket分层
 ///
 pub fn find_layer(
     coors: &ArrayView2<'_, f64>,
@@ -324,14 +324,13 @@ pub fn find_layer(
 }
 
 ///
-/// 找到的pockets并分层
-///
+/// 找到的pocket并分层
 ///
 pub fn find_layer_core(
     protein: &mut Protein,
     pr: f64,
 ) -> ndarray::ArrayBase<ndarray::OwnedRepr<f64>, ndarray::Dim<[usize; 2]>> {
-    let grid = find_pockets_core(protein, pr);
+    let grid = find_pocket_core(protein, pr);
 
     let rows = grid.nrows();
 
@@ -479,9 +478,9 @@ mod tests {
 
         let n = 100;
 
-        // info!("start find pockets");
+        // info!("start find pocket");
 
-        // let grid = find_pockets(&a.view(), Some(&b), n, Some(20.));
+        // let grid = find_pocket(&a.view(), Some(&b), n, Some(20.));
 
         // assert_eq!(23831, grid.shape()[0]);
 

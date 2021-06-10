@@ -6,7 +6,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     config::get_hdp_vec,
-    pockets::find_layer_core,
+    pocket::find_layer_core,
     surface::{Protein, DEFAULT_PTR},
     utils::distance,
 };
