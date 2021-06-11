@@ -104,7 +104,7 @@ def cal_energy_expansion_coeff(theta0):
     """
     sinTheta0 = np.sin(theta0)
     cosTheta0 = np.cos(theta0)
-    d_C2 = 1.0 / (4.0 * max((sinTheta0 * sinTheta0), 0.00000001))
+    d_C2 = 1.0 / (4.0 * max((sinTheta0 * sinTheta0), 1e-8))
     d_C1 = -4.0 * d_C2 * cosTheta0
     d_C0 = d_C2 * (2.0 * cosTheta0 * cosTheta0 + 1.0)
     return (d_C0, d_C1, d_C2)
@@ -132,7 +132,7 @@ def cal_angle_energy_grad(angle, coors, eles):
     atom_type_k = get_atom_type(eles[atom_k])
 
     theta0 = get_uff_par(atom_type_j, "theta0")  # the node atom
-    theta0 = theta0 / 180.0 * np.pi  # convert to rand
+    theta0 = theta0 / 180.0 * np.pi  # convert to rad
 
     pos_a = coors[atom_i]
     pos_b = coors[atom_j]
@@ -158,22 +158,22 @@ def cal_angle_energy_grad(angle, coors, eles):
     dist_ba = get_distance(pos_b, pos_a)
     dist_bc = get_distance(pos_b, pos_c)
 
-    norm_ba_vec = (pos_b - pos_a) / dist_ba
-    norm_bc_vec = (pos_b - pos_c) / dist_bc
+    norm_ab_vec = (pos_a - pos_b) / dist_ba
+    norm_cb_vec = (pos_c - pos_b) / dist_bc
     # print(ba_vec, bc_vec)
     # print(cosTheta*ba_vec)
 
-    sinTheta = max(np.sqrt(sinThetaSq), 0.00000001)
+    sinTheta = max(np.sqrt(sinThetaSq), 1e-8)
     # print(sinTheta)
     sin2Theta = 2.0 * sinTheta * cosTheta
 
     dE_dTheta = cal_dE_dtheta(force_cons, d_C1, d_C2, sinTheta, sin2Theta)
     dTheta_dPos_a = (
-        (1 / dist_ba * (norm_bc_vec - cosTheta * norm_ba_vec)) * (-1) / sinTheta
-    )
+        1 / dist_ba * (norm_cb_vec - cosTheta * norm_ab_vec)
+    ) / -sinTheta
     dTheta_dPos_c = (
-        (1 / dist_bc * (norm_ba_vec - cosTheta * norm_bc_vec)) * (-1) / sinTheta
-    )
+        1 / dist_bc * (norm_ab_vec - cosTheta * norm_cb_vec)
+    ) / -sinTheta
     grad_a = dE_dTheta * dTheta_dPos_a
     grad_c = dE_dTheta * dTheta_dPos_c
     grad_b = -(grad_a + grad_c)

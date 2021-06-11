@@ -55,10 +55,12 @@ def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
     counter = 0
     trj = []
     energy = []
+    e1 = 1e09
     for _ in range(maxIter):
+        e1 = e1
         counter += 1
-        Energy, grad = func(currrent_pos, eles)
-        energy.append(Energy)
+        e2, grad = func(currrent_pos, eles)
+        energy.append(e2)
         grad = normalizeGrad(grad)
         # print("energy= {:6.2f}".format(Energy))
         print("grandient= \n{}".format(grad.round(2)))
@@ -69,12 +71,21 @@ def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
         newStep = np.where(
             newStep < -trustRadius, -trustRadius, newStep
         )  # negative big step4
-        if np.all(np.abs(newStep) < torerance):
-            break
-        currrent_pos += newStep
+        # if np.all(np.abs(newStep) < torerance):
+        #    break
+        currrent_pos += newStep  # update positon
         # print(currrent_pos)
         trj.append(np.array(currrent_pos))  # deep copy
-        print(counter)
+        if IsNear(e2, e1, 1.0e-6):
+            break
+        if e2 > e1:  # // decrease stepsize
+            step *= 0.1
+        elif e2 < e1:  # // increase stepsize
+            e1 = e2
+            step *= 1.15
+            if step > 1.0:
+                step = 1.0
+    print(counter)
     return (currrent_pos, trj, np.array(energy))
     # # print(newStep)
     #
