@@ -186,9 +186,9 @@ def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
     r_desired = cal_real_bond_length(bond_order, atom_type_i, atom_type_j)
     print("R_desired = {}".format(r_desired))
     force_cons = cal_bond_force_cons(atom_type_i, atom_type_j, r_desired)
-    print("Force Constant = {:6.2f}".format(force_cons))
+    # print("Force Constant = {:6.2f}".format(force_cons))
     E_bond = 0.5 * force_cons * (r_curr - r_desired) ** 2
-    print("Ebond = {:6.2f}".format(E_bond))
+    # print("Ebond = {:6.2f}".format(E_bond))
 
     u_vec = (coors[atom_i] - coors[atom_j]) / r_curr
     G_bond = force_cons * (r_curr - r_desired) * u_vec
@@ -259,11 +259,3 @@ def get_bonds_energy_grad(coors, elemets):
         grad[atom_j] -= G
     return (E, grad)
 
-
-def optimization_SD(coors, eles, maxIter=50):
-    pos = coors
-    for i in range(maxIter):
-        E, G = get_bonds_energy_grad(pos, eles)
-        pos = pos - (0.001 * G)
-        print("E = {:6.2f}\n".format(E), "G = {}".format(G.round(2)))
-    return pos

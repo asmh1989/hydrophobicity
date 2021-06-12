@@ -10,7 +10,7 @@ return energy and gradient
 
 import numpy as np
 
-from conformation.uff_bond import get_atom_type, get_distance, get_uff_par
+from uff_bond import get_atom_type, get_distance, get_uff_par
 
 
 def calcNonbondedMinimum(atom_type_i, atom_type_j):
