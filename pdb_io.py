@@ -95,4 +95,3 @@ def xyz2trj(datalist, ele="H", filename="test.xyz"):
         res.append(df2)
     res = pd.concat(res)
     res.to_csv(filename, header=None, index=None, sep="\t")
-

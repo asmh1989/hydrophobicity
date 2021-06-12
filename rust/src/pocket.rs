@@ -183,7 +183,7 @@ fn select_point_by_atomic(
                     .into_iter()
                     .enumerate()
                     .for_each(|(i, f)| {
-                        if *f < r.powi(2) {
+                        if f < r.powi(2) {
                             let m = &mut cache.lock().unwrap();
                             m.push(start + i);
                         }
