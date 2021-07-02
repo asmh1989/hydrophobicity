@@ -6,9 +6,13 @@ search conformer
 @Author      :likun.yang
 """
 
+import copy
+
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
+from rdkit.ML.Cluster import Butina
 
 platinum_diverse_dataset_path = "/home/yanglikun/git/protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
 bostrom_path = "/home/yanglikun/git/protein/conformation/dataset/bostrom.sdf"
@@ -23,89 +27,201 @@ def process_mol(sdfMol):
     """
     molSmiles = Chem.MolToSmiles(sdfMol)
     mol = Chem.MolFromSmiles(molSmiles)
-    mol_H = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol_H, randomSeed=1)
-    return mol_H
+    return mol
 
 
 # AllChem.MMFFOptimizeMolecule(mol_H, maxIters=200, mmffVariant="MMFF94s")
 # Chem.AssignAtomChiralTagsFromStructure(mol_H, replaceExistingTags=True)
 
 ###################################################################################
+def change_epsilon(mol_H, epilon=1, maxIter=200):
+
+    prop = AllChem.MMFFGetMoleculeProperties(
+        mol_H, mmffVariant="MMFF94s"
+    )  # get MMFF prop
+    prop.SetMMFFDielectricConstant(
+        epilon
+    )  # change dielectric constant, default value is 1
+    for id in range(mol_H.GetNumConformers()):
+        ff = AllChem.MMFFGetMoleculeForceField(
+            mol_H, prop, confId=id
+        )  # load force filed
+        ff.Minimize(maxIter)  # minimize the confs
 
 
-def gen_conf(
-    mol_H, num_of_conformer=50, RmsThresh=0.1, randomSeed=1, numThreads=0
-):
-    cids = AllChem.EmbedMultipleConfs(
+def gen_conf(mol, RmsThresh=0.1, randomSeed=1, numThreads=0):
+    nr = int(AllChem.CalcNumRotatableBonds(mol))
+    Chem.AssignAtomChiralTagsFromStructure(mol, replaceExistingTags=True)
+    if nr <= 3:
+        nc = 50
+    elif nr > 6:
+        nc = 300
+    else:
+        nc = nr ** 3
+    mol_H = Chem.AddHs(mol)
+    AllChem.EmbedMolecule(mol_H, randomSeed=1)
+    AllChem.EmbedMultipleConfs(
         mol_H,
-        numConfs=num_of_conformer,
+        numConfs=nc,
         maxAttempts=1000,
         randomSeed=randomSeed,
         pruneRmsThresh=RmsThresh,
         numThreads=numThreads,
     )  # randomSeed 为了复现结果 #numThreads=0 means use all theads aviliable
-    return cids
+    return mol_H
 
 
-def calc_RMSD(mol_H, ref_mol):
+def calcConfRMSD(mol_H, ref_mol):
     RMSD = []
-    num_of_conformer = mol_H.GetNumConformers()
     mol_No_H = Chem.RemoveHs(mol_H)  # remove H to calc RMSD
-    for idx in range(num_of_conformer):
-        _rmsd = rdMolAlign.GetBestRMS(mol_No_H, ref_mol, prbId=idx)
+    for indx, conformer in enumerate(mol_No_H.GetConformers()):
+        conformer.SetId(indx)
+        _rmsd = rdMolAlign.GetBestRMS(mol_No_H, ref_mol, prbId=indx)
         RMSD.append(_rmsd)
     return np.array(RMSD)
 
 
-def run_Conf_Search(sdf_dataset):
+def calc_energy(mol_H, minimizeIts=200):
+    results = {}
+    num_conformers = mol_H.GetNumConformers()
+    for conformerId in range(num_conformers):
+        prop = AllChem.MMFFGetMoleculeProperties(mol_H, mmffVariant="MMFF94s")
+        ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=conformerId)
+        ff.Initialize()
+        if minimizeIts > 0:
+            ff.Minimize(maxIts=minimizeIts)
+        results[conformerId] = ff.CalcEnergy()
+    return results
+
+
+def calcConfEnergy(mol_H, maxIters=0):
+    res = AllChem.MMFFOptimizeMoleculeConfs(
+        mol_H, mmffVariant="MMFF94s", maxIters=maxIters, numThreads=0
+    )
+    return np.array(res)[:, 1]
+
+
+def energyCleaning(mol_H, confEnergies, cutEnergy=5):
+    res = confEnergies
+    res = res - res.min()  # get relative energies
+    removeIds = np.where(res > cutEnergy)[0]
+    for id in removeIds:
+        mol_H.RemoveConformer(int(id))
+    for idx, conformer in enumerate(mol_H.GetConformers()):
+        conformer.SetId(idx)
+    return mol_H
+
+
+def groupEnergyCleaing(mol_H, ConfEnergies, ButinaClusters):
+    keepIdx = []
+    molCopy = copy.deepcopy(mol_H)
+    mol_H.RemoveAllConformers()
+    for cluster in ButinaClusters:
+        energyGroup = ConfEnergies[list(cluster)]
+        df = pd.DataFrame([energyGroup, cluster]).T
+        df = df.sort_values(0)
+        idx = df[1].values[:1]
+        keepIdx.extend(idx)
+    for idx in keepIdx:
+        mol_H.AddConformer(molCopy.GetConformer(int(idx)))
+    return mol_H
+
+
+def groupCleaing(mol_H, ButinaClusters):
+    molCopy = copy.deepcopy(mol_H)
+    mol_H.RemoveAllConformers()
+    keepId = []
+    for cluster in ButinaClusters:
+        id = cluster[:2]
+        keepId.extend(id)
+    for id in keepId:
+        mol_H.AddConformer(molCopy.GetConformer(int(id)))
+    return mol_H
+
+
+def getButinaClusters(mol_H, RmstThresh=0.5):
+    molNoH = Chem.RemoveHs(mol_H)
+    numConfs = molNoH.GetNumConformers()
+    rmsma = AllChem.GetConformerRMSMatrix(molNoH)
+    ButinaClusters = Butina.ClusterData(
+        rmsma, numConfs, distThresh=RmstThresh, isDistData=True, reordering=True
+    )
+    return ButinaClusters
+
+
+def postRmsClening(mol_H, RmstThresh=0.5):
+    molCopy = copy.deepcopy(mol_H)
+    ButinaClusters = getButinaClusters(mol_H, RmstThresh=RmstThresh)
+    mol_H.RemoveAllConformers()
+    for cluster in ButinaClusters:
+        idx = cluster[0]
+        mol_H.AddConformer(molCopy.GetConformer(idx))
+    return mol_H
+
+
+def localMinCleaning(mol_H, ConfEn):
+    localMin = findLocalMin(ConfEn)
+    idx = np.where(localMin)[0]
+    molCopy = copy.deepcopy(mol_H)
+    mol_H.RemoveAllConformers()
+    for i in idx:
+        mol_H.AddConformer(molCopy.GetConformer(int(i)))
+    return mol_H
+
+
+def run_Conf_Search(sdf_dataset, sample_size=100, cutEnergy=10, RmstThresh=0.5):
     # num_mols = len(sdf_dataset)
     counter_1 = 0
     counter_2 = 0
-    random_ll = np.random.randint(1000, size=(1000))
+    total_num_of_conformer = 0
+    sample_size = sample_size
+    np.random.seed(0)
+    random_ll = np.random.randint(2859, size=(sample_size))
     for id in random_ll:
-        mol = sdf_dataset[int(id)]
-        mol_H = process_mol(mol)
-        gen_conf(
-            mol_H,
-            num_of_conformer=250,
-            RmsThresh=0.1,
-            randomSeed=1,
-            numThreads=0,
+        sdf_mol = sdf_dataset[int(id)]
+        mol = process_mol(sdf_mol)
+        mol_H = gen_conf(
+            mol, RmsThresh=0.5, randomSeed=1, numThreads=0
         )  # confs stored in side the mol object
-        rmsd = calc_RMSD(mol_H, mol)
+        # confEnergies = calcConfEnergy(mol_H, maxIters=200)  #  get its energy
+        # mol_H = energyCleaning(mol_H, confEnergies, cutEnergy=cutEnergy)
+        # ButinaClusters = getButinaClusters(mol_H, RmstThresh=RmstThresh)
+        # mol_H = groupEnergyCleaing(mol_H, confEnergies, ButinaClusters)
+        # mol_H = groupCleaing(mol_H, ButinaClusters)
+        # mol_H = localMinCleaning(mol_H, confEnergies)
+        # mol_H = groupEnergyCleaing(mol_H, confEnergies, ButinaClusters)
+        # mol_H = energyCleaning(mol_H, confEnergies, cutEnergy=cutEnergy)
+        # mol_H = postRmsClening(mol_H, RmstThresh=RmstThresh)
+        # change_epsilon(mol_H, epilon=100)
+        num_of_conformer = mol_H.GetNumConformers()
+        total_num_of_conformer += num_of_conformer
+        rmsd = calcConfRMSD(mol_H, sdf_mol)
         if np.any(rmsd <= 1):
             counter_1 += 1
         if np.any(rmsd <= 2):
             counter_2 += 1
-    reprocuce_rate_within_1 = counter_1 / 1000
-    reprocuce_rate_within_2 = counter_2 / 1000
+    mean_conformer = total_num_of_conformer / sample_size
+    reprocuce_rate_within_1 = counter_1 / sample_size
+    reprocuce_rate_within_2 = counter_2 / sample_size
+    print("{} mean num of conformers".format(int(mean_conformer)))
     print("{:.0%} reprocuce rate within RMSD 1".format(reprocuce_rate_within_1))
     print("{:.0%} reprocuce rate within RMSD 2".format(reprocuce_rate_within_2))
 
 
-# def ECleaing():
+import matplotlib.pyplot as plt
 
 
-# def RmsCleaning():
+def plotEn(en):
+    plt.plot(en)
+    plt.scatter(range(len(en)), en)
+    for i in range(len(en)):
+        plt.annotate(i, xy=(i, en[i]))
 
 
-#############################################################
-# mmff optimazation
-# AllChem.MMFFOptimizeMoleculeConfs(
-#     mol_H, maxIters=400, mmffVariant="MMFF94s", numThreads=0
-# )  # default maxIters is 200
-######################################################
-# change dielectricConstant
-# for id in range(200):
-#     prop = AllChem.MMFFGetMoleculeProperties(mol_H, mmffVariant="MMFF94s")
-#     prop.SetMMFFDielectricConstant(10)
-#     ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=id)
-#     ff.Minimize()
-##############################################################
-# uff optimazation
-# AllChem.UFFOptimizeMoleculeConfs(mol_H, maxIters=400, numThreads=0)
-################################################
+def findLocalMin(data):
+    res = np.r_[True, data[1:] < data[:-1]] & np.r_[data[:-1] < data[1:], True]
+    return res
+
 
 ######################################################################
 """
