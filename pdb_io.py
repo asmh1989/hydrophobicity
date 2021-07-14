@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
@@ -95,3 +97,22 @@ def xyz2trj(datalist, ele="H", filename="test.xyz"):
         res.append(df2)
     res = pd.concat(res)
     res.to_csv(filename, header=None, index=None, sep="\t")
+
+
+def read_xyz(filename, dir="."):
+    """
+    xyz format
+    3 #numer of atoms
+      # blank line
+    H 0 0 0
+    O 0 0 2
+    H 0 0 4
+
+    return coor,elements #in numpy array
+    """
+    file_path = os.path.join(dir, filename)
+    df = pd.read_csv(file_path, header=None, sep="\s+", skiprows=2)
+    coors = df.iloc[:, 1:].values
+    eles = df.iloc[:, 0].values.astype("str")
+    eles = np.char.upper(eles)  # convert to uppercase
+    return (coors, eles)

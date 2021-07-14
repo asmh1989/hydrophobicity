@@ -1,18 +1,27 @@
 # -*- encoding: utf-8 -*-
 """
 @Description:       :
-search conformer
+利用ETKDG算法生成conformations,然后利用能量和RMS在尽量不损失精度的情况下，减小conformation的
+数量。
 @Date     :2021/06/23 10:58:30
 @Author      :likun.yang
 """
 
+import concurrent.futures
 import copy
+from multiprocessing import cpu_count
 
+# sys.path.append("/home/yanglikun/git/")
 import numpy as np
 import pandas as pd
+
+# from protein import mol_surface
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
 from rdkit.ML.Cluster import Butina
+
+# import sys
+
 
 platinum_diverse_dataset_path = "/home/yanglikun/git/protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
 bostrom_path = "/home/yanglikun/git/protein/conformation/dataset/bostrom.sdf"
@@ -34,19 +43,61 @@ def process_mol(sdfMol):
 # Chem.AssignAtomChiralTagsFromStructure(mol_H, replaceExistingTags=True)
 
 ###################################################################################
-def change_epsilon(mol_H, epilon=1, maxIter=200):
-
+def ChangeEpsilon(mol_H, id, maxIter, epilon):
     prop = AllChem.MMFFGetMoleculeProperties(
         mol_H, mmffVariant="MMFF94s"
     )  # get MMFF prop
     prop.SetMMFFDielectricConstant(
         epilon
     )  # change dielectric constant, default value is 1
+    ff = AllChem.MMFFGetMoleculeForceField(
+        mol_H, prop, confId=id
+    )  # load force filed
+    ff.Initialize()
+    ff.Minimize(maxIter)  # minimize the confs
+    en = ff.CalcEnergy()
+    return (id, en)
+
+
+def ChangeEpsilonParallel(mol_H, epilon=1, maxIter=200):
+    """并行化"""
+    res = []
+    with concurrent.futures.ProcessPoolExecutor(
+        max_workers=cpu_count()
+    ) as executor:
+        futures = [
+            executor.submit(ChangeEpsilon, mol_H, id, maxIter, epilon)
+            for id in range(mol_H.GetNumConformers())
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            # add result to total data
+            res.append(future.result())
+        # for id in range(mol_H.GetNumConformers()):
+        #    future = executor.submit(task, mol_H, id, maxIter, epilon)
+        # for future in concurrent.futures.as_completed(_futures):
+        #    res.append(future.result())
+    res.sort()  # in-place
+    return np.array(res)[:, 1]
+
+
+def change_epsilon(mol_H, epilon=1, maxIter=0):
+    """可以并行化"""
+    ens = []
+    prop = AllChem.MMFFGetMoleculeProperties(
+        mol_H, mmffVariant="MMFF94s"
+    )  # get MMFF prop
+    prop.SetMMFFDielectricConstant(
+        epilon
+    )  # change dielectric constant, default value is 1
+
     for id in range(mol_H.GetNumConformers()):
         ff = AllChem.MMFFGetMoleculeForceField(
             mol_H, prop, confId=id
         )  # load force filed
-        ff.Minimize(maxIter)  # minimize the confs
+        # ff.Minimize(maxIter)  # minimize the confs
+        en = ff.CalcEnergy()
+        ens.append(en)
+    return np.array(ens)
 
 
 def gen_conf(mol, RmsThresh=0.1, randomSeed=1, numThreads=0):
@@ -104,6 +155,7 @@ def calcConfEnergy(mol_H, maxIters=0):
 def energyCleaning(mol_H, confEnergies, cutEnergy=5):
     res = confEnergies
     res = res - res.min()  # get relative energies
+    # res = res - res.mean()
     removeIds = np.where(res > cutEnergy)[0]
     for id in removeIds:
         mol_H.RemoveConformer(int(id))
@@ -169,13 +221,79 @@ def localMinCleaning(mol_H, ConfEn):
     return mol_H
 
 
-def run_Conf_Search(sdf_dataset, sample_size=100, cutEnergy=10, RmstThresh=0.5):
+def findLocalMin(data):
+    res = np.r_[True, data[1:] < data[:-1]] & np.r_[data[:-1] < data[1:], True]
+    return res
+
+
+def countCSPInSAS(molH, n=100):
+    molNoH = Chem.RemoveHs(molH)
+    res = []
+    atoms = np.array([i.GetSymbol() for i in molNoH.GetAtoms()])
+    numConfs = molNoH.GetNumConformers()
+    for i in range(numConfs):
+        conf = molNoH.GetConformer(i)
+        pos = conf.GetPositions()
+        sa = mol_surface.sa_surface(pos, atoms, n=n, enable_ext=False)
+        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[
+            0
+        ]
+        tmp = np.isin(sa[:, -1], carbonIdx)
+        numCarbon = np.count_nonzero(tmp)
+        res.append(numCarbon / n)
+    return np.array(res)
+
+
+def NoUse(molH, n=100):
+    molNoH = Chem.RemoveHs(molH)
+    res = []
+    atoms = np.array([i.GetSymbol() for i in molNoH.GetAtoms()])
+    numConfs = molNoH.GetNumConformers()
+    for i in range(numConfs):
+        conf = molNoH.GetConformer(i)
+        pos = conf.GetPositions()
+        sa = mol_surface.sa_surface(pos, atoms, n=n, enable_ext=False)
+        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[
+            0
+        ]
+        tmp = np.isin(sa[:, -1], carbonIdx)
+        numCarbon = np.count_nonzero(tmp)
+        res.append(numCarbon / n)
+    return np.array(res)
+
+
+def normalizeData(data):
+    """
+    project grad to [-1,1]
+
+    grad = grad - grad.mean(axis=0) / grad.max(axis=0) - grad.min(axis=0)
+   
+    """
+    a = data - data.mean(axis=0)
+    b = data.max(axis=0) - data.min(axis=0)
+    c = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    return c
+
+
+def changeEnergyBaseOnSAS(en, normalizedNumC, coff=1):
+    return en - coff * (en * normalizedNumC)
+
+
+def changeEnergyBaseOnSASNoUse(en, sasa, coff=100):
+    return en - coff * sasa
+
+
+def run_Conf_Search(
+    sdf_dataset, sample_size=100, cutEnergy=25, RmstThresh=1, coff=0.1, epilon=1
+):
     # num_mols = len(sdf_dataset)
     counter_1 = 0
     counter_2 = 0
     total_num_of_conformer = 0
+    deltaSASA = []
+    deltaE = []
     sample_size = sample_size
-    np.random.seed(0)
+    np.random.seed(0)  # 为了结果的复现
     random_ll = np.random.randint(2859, size=(sample_size))
     for id in random_ll:
         sdf_mol = sdf_dataset[int(id)]
@@ -183,19 +301,33 @@ def run_Conf_Search(sdf_dataset, sample_size=100, cutEnergy=10, RmstThresh=0.5):
         mol_H = gen_conf(
             mol, RmsThresh=0.5, randomSeed=1, numThreads=0
         )  # confs stored in side the mol object
-        # confEnergies = calcConfEnergy(mol_H, maxIters=200)  #  get its energy
-        # mol_H = energyCleaning(mol_H, confEnergies, cutEnergy=cutEnergy)
+        confEnergies = change_epsilon(mol_H, epilon=epilon)
+        # confEnergies = calcConfEnergy(mol_H, maxIters=0)  #  get its energy
+        # confEnergies = ChangeEpsilonParallel(mol_H, epilon=epilon)
+        # lowestEnId = confEnergies.argmin()
+        # normalizedNumC = countCSPInSAS(mol_H, n=100)
+        # NumCSP = countCSPInSAS(mol_H, n=100)
+
+        # confEnergies = changeEnergyBaseOnSAS(
+        #    confEnergies, normalizedNumC, coff=coff
+        # )
+        # sasa = NoUse(mol_H)
+        # confEnergies = changeEnergyBaseOnSASNoUse(confEnergies, sasa, coff=coff)
+        mol_H = energyCleaning(mol_H, confEnergies, cutEnergy=cutEnergy)
+        mol_H = postRmsClening(mol_H, RmstThresh=RmstThresh)
         # ButinaClusters = getButinaClusters(mol_H, RmstThresh=RmstThresh)
         # mol_H = groupEnergyCleaing(mol_H, confEnergies, ButinaClusters)
         # mol_H = groupCleaing(mol_H, ButinaClusters)
         # mol_H = localMinCleaning(mol_H, confEnergies)
-        # mol_H = groupEnergyCleaing(mol_H, confEnergies, ButinaClusters)
         # mol_H = energyCleaning(mol_H, confEnergies, cutEnergy=cutEnergy)
-        # mol_H = postRmsClening(mol_H, RmstThresh=RmstThresh)
-        # change_epsilon(mol_H, epilon=100)
+
         num_of_conformer = mol_H.GetNumConformers()
         total_num_of_conformer += num_of_conformer
         rmsd = calcConfRMSD(mol_H, sdf_mol)
+        # lowestRMSId = rmsd.argmin()
+
+        # deltaSASA.append(NumCSP[lowestRMSId] - NumCSP[lowestEnId])
+        # deltaE.append(confEnergies[lowestRMSId] - confEnergies[lowestEnId])
         if np.any(rmsd <= 1):
             counter_1 += 1
         if np.any(rmsd <= 2):
@@ -206,21 +338,24 @@ def run_Conf_Search(sdf_dataset, sample_size=100, cutEnergy=10, RmstThresh=0.5):
     print("{} mean num of conformers".format(int(mean_conformer)))
     print("{:.0%} reprocuce rate within RMSD 1".format(reprocuce_rate_within_1))
     print("{:.0%} reprocuce rate within RMSD 2".format(reprocuce_rate_within_2))
+    # return (np.array(deltaSASA), np.array(deltaE), random_ll)
 
 
 import matplotlib.pyplot as plt
 
 
-def plotEn(en):
+def plotEn(en, anno):
     plt.plot(en)
     plt.scatter(range(len(en)), en)
-    for i in range(len(en)):
-        plt.annotate(i, xy=(i, en[i]))
+    for i, j in enumerate(anno):
+        plt.annotate(round(j, 2), xy=(i, en[i]))
 
 
-def findLocalMin(data):
-    res = np.r_[True, data[1:] < data[:-1]] & np.r_[data[:-1] < data[1:], True]
-    return res
+def alignConf(mol, ref):
+    numConf = mol.GetNumConformers()
+    for id in range(numConf):
+        AllChem.AlignMol(mol, ref, prbCid=id, refCid=0)
+    return 0
 
 
 ######################################################################

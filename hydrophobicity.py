@@ -15,10 +15,16 @@ from core import mkdir_by_file, vdw_radii
 from find_pocket import layer_grids
 from mol_surface import sa_surface
 
-atomic_hydrophobicity_file_path = "data/atomic_hydrophobicity.csv"
+atomic_hydrophobicity_file_path = (
+    "/home/yanglikun/git/protein/data/atomic_hydrophobicity.csv"
+)
 atomic_hydrophobicity = (
     pd.read_csv(atomic_hydrophobicity_file_path).iloc[:, :3].values
 )
+"""当在别处调用这个module时会找不到这个文件，下一步要解决这个问题。可以将这个csv文件写到一个module中
+到时调用这个module
+2021-7-5
+likun"""
 
 
 def get_atomic_sovation_para(resn, atom):
