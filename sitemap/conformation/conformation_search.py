@@ -14,17 +14,21 @@ from multiprocessing import cpu_count
 # sys.path.append("/home/yanglikun/git/")
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 # from protein import mol_surface
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
 from rdkit.ML.Cluster import Butina
+from sitemap.hydrophobicity.mol_surface import sa_surface
 
 # import sys
 
 
-platinum_diverse_dataset_path = "/home/yanglikun/git/protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
-bostrom_path = "/home/yanglikun/git/protein/conformation/dataset/bostrom.sdf"
+platinum_diverse_dataset_path = (
+    "protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
+)
+bostrom_path = "protein/conformation/dataset/bostrom.sdf"
 platinum_diverse_dataset = Chem.SDMolSupplier(platinum_diverse_dataset_path)
 bostrom_dataset = Chem.SDMolSupplier(bostrom_path)
 
@@ -50,9 +54,7 @@ def ChangeEpsilon(mol_H, id, maxIter, epilon):
     prop.SetMMFFDielectricConstant(
         epilon
     )  # change dielectric constant, default value is 1
-    ff = AllChem.MMFFGetMoleculeForceField(
-        mol_H, prop, confId=id
-    )  # load force filed
+    ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=id)  # load force filed
     ff.Initialize()
     ff.Minimize(maxIter)  # minimize the confs
     en = ff.CalcEnergy()
@@ -62,9 +64,7 @@ def ChangeEpsilon(mol_H, id, maxIter, epilon):
 def ChangeEpsilonParallel(mol_H, epilon=1, maxIter=200):
     """并行化"""
     res = []
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=cpu_count()
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count()) as executor:
         futures = [
             executor.submit(ChangeEpsilon, mol_H, id, maxIter, epilon)
             for id in range(mol_H.GetNumConformers())
@@ -234,10 +234,8 @@ def countCSPInSAS(molH, n=100):
     for i in range(numConfs):
         conf = molNoH.GetConformer(i)
         pos = conf.GetPositions()
-        sa = mol_surface.sa_surface(pos, atoms, n=n, enable_ext=False)
-        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[
-            0
-        ]
+        sa = sa_surface(pos, atoms, n=n, enable_ext=False)
+        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[0]
         tmp = np.isin(sa[:, -1], carbonIdx)
         numCarbon = np.count_nonzero(tmp)
         res.append(numCarbon / n)
@@ -252,10 +250,8 @@ def NoUse(molH, n=100):
     for i in range(numConfs):
         conf = molNoH.GetConformer(i)
         pos = conf.GetPositions()
-        sa = mol_surface.sa_surface(pos, atoms, n=n, enable_ext=False)
-        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[
-            0
-        ]
+        sa = sa_surface(pos, atoms, n=n, enable_ext=False)
+        carbonIdx = np.where((atoms == "C") | (atoms == "S") | (atoms == "P"))[0]
         tmp = np.isin(sa[:, -1], carbonIdx)
         numCarbon = np.count_nonzero(tmp)
         res.append(numCarbon / n)
@@ -265,9 +261,7 @@ def NoUse(molH, n=100):
 def normalizeData(data):
     """
     project grad to [-1,1]
-
     grad = grad - grad.mean(axis=0) / grad.max(axis=0) - grad.min(axis=0)
-   
     """
     a = data - data.mean(axis=0)
     b = data.max(axis=0) - data.min(axis=0)
@@ -339,9 +333,6 @@ def run_Conf_Search(
     print("{:.0%} reprocuce rate within RMSD 1".format(reprocuce_rate_within_1))
     print("{:.0%} reprocuce rate within RMSD 2".format(reprocuce_rate_within_2))
     # return (np.array(deltaSASA), np.array(deltaE), random_ll)
-
-
-import matplotlib.pyplot as plt
 
 
 def plotEn(en, anno):

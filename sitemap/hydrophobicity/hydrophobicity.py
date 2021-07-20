@@ -8,23 +8,14 @@ Created on Tue Apr 20 16:37:11 2021
 """
 import numpy as np
 import pandas as pd
+from sitemap.core import mkdir_by_file, vdw_radii
+from sitemap.hydrophobicity.find_pocket import layer_grids
+from sitemap.hydrophobicity.mol_surface import sa_surface
+from sitemap.hydrophobicity.pdb_io import read_pdb, to_pdb, to_xyz
 from sz_py_ext import run_hydrophobicity
 
-import pdb_io
-from core import mkdir_by_file, vdw_radii
-from find_pocket import layer_grids
-from mol_surface import sa_surface
-
-atomic_hydrophobicity_file_path = (
-    "/home/yanglikun/git/protein/data/atomic_hydrophobicity.csv"
-)
-atomic_hydrophobicity = (
-    pd.read_csv(atomic_hydrophobicity_file_path).iloc[:, :3].values
-)
-"""当在别处调用这个module时会找不到这个文件，下一步要解决这个问题。可以将这个csv文件写到一个module中
-到时调用这个module
-2021-7-5
-likun"""
+atomic_hydrophobicity_file_path = "data/atomic_hydrophobicity.csv"
+atomic_hydrophobicity = pd.read_csv(atomic_hydrophobicity_file_path).iloc[:, :3].values
 
 
 def get_atomic_sovation_para(resn, atom):
@@ -51,9 +42,7 @@ def get_accessible_solvent_area(sa, vdw_r, index, n=100):
     n为产生单位圆时取得点数，要与sa_surface用的点数相同
     index:原子在体系中的index"""
     # len(solvent_accessible_points[index]) : 该原子贡献的SASpoints
-    return (
-        4 * np.pi * np.square(vdw_r + 1.4) / n * sa[sa[:, -1] == index].shape[0]
-    )
+    return 4 * np.pi * np.square(vdw_r + 1.4) / n * sa[sa[:, -1] == index].shape[0]
 
 
 def find_within_radii_atoms(grid, atom_coors, elements, resns, sa, n=40):
@@ -103,9 +92,7 @@ def find_within_radii_grids(grid, grids):
     felt_grids = grids[d < 81.01]  # 9^2 + .1
     d = np.sqrt(d[d < 81.01])
     layer_velues = felt_grids[:, -1]
-    new_water_hydro = layer_velues.dot(np.exp(-0.7 * d)) / np.sum(
-        np.exp(-0.7 * d)
-    )
+    new_water_hydro = layer_velues.dot(np.exp(-0.7 * d)) / np.sum(np.exp(-0.7 * d))
     return new_water_hydro
     # return(d, felt_grids)
 
@@ -146,26 +133,22 @@ def cal_grids_hydro(
 
 def run_hydro(filename, n=100, pas_r=20, dir=".", enable_ext=True):
     mkdir_by_file(dir, isDir=True)
-    atom_coors, eles, resns = pdb_io.read_pdb(filename)
+    atom_coors, eles, resns = read_pdb(filename)
 
     if enable_ext:
         grid_hyo = run_hydrophobicity(atom_coors, eles, resns, n, pas_r)
         grid_coors = grid_hyo[:, :3]
         hyo = grid_hyo[:, -1]
-        pdb_io.to_pdb(
-            grid_coors,
-            hyo,
-            filename="{}/{}_hyo_rust.pdb".format(dir, filename[:-4]),
+        to_pdb(
+            grid_coors, hyo, filename="{}/{}_hyo_rust.pdb".format(dir, filename[:-4]),
         )
         return grid_hyo
 
     layered_grids = layer_grids(atom_coors, eles, n=n, pr=pas_r)
     sa = sa_surface(atom_coors, eles, n=n, pr=1.4)
-    pdb_io.to_xyz(sa, filename="{}/{}_SAS.xyz".format(dir, filename[:-4]))
+    to_xyz(sa, filename="{}/{}_SAS.xyz".format(dir, filename[:-4]))
     hyo = cal_grids_hydro(layered_grids, atom_coors, eles, resns, sa, n=n)
     grid_coors = layered_grids[:, :3]
-    pdb_io.to_pdb(
-        grid_coors, hyo, filename="{}/{}_hyo.pdb".format(dir, filename[:-4])
-    )
+    to_pdb(grid_coors, hyo, filename="{}/{}_hyo.pdb".format(dir, filename[:-4]))
     print("Done")
     return np.insert(grid_coors, 3, hyo, axis=1)

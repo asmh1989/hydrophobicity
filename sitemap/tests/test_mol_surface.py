@@ -1,10 +1,9 @@
 import logging
 
 import numpy as np
-
-from find_pocket import find_pocket, layer_grids
-from mol_surface import connolly_surface, sa_surface
-from pdb_io import read_pdb, to_xyz
+from sitemap.hydrophobicity.find_pocket import find_pocket, layer_grids
+from sitemap.hydrophobicity.mol_surface import connolly_surface, sa_surface
+from sitemap.hydrophobicity.pdb_io import read_pdb, to_xyz
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +21,7 @@ def test_sa_surface_rust(p=pdb):
     c, e, r = read_pdb(p)
     dots = sa_surface(c, e, n=n, pr=1.4)
     logger.info("dots = %s", dots.shape)
-    to_xyz(
-        dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n)
-    )
+    to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
 
 
 def test_sa_surface_python(p=pdb):
@@ -32,25 +29,20 @@ def test_sa_surface_python(p=pdb):
     dots = sa_surface(c, e, n=n, pr=1.4, enable_ext=False)
     logger.info("dots = %s", dots.shape)
 
-    to_xyz(
-        dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n)
-    )
+    to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
 
 
 def test_connolly_surface_rust(p=pdb):
     c, e, r = read_pdb(p)
     dots = connolly_surface(c, e, n=n, pr=1.4)
-    to_xyz(
-        dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n)
-    )
+    to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
 
 
 def test_connolly_surface_python(p=pdb):
     c, e, r = read_pdb(p)
-    dots = connolly_surface(c, e, n=n, pr=1.4, enable_ext=False)
+    dots = connolly_surface(c, e, n=10, pr=1.4, enable_ext=False)
     to_xyz(
-        dots,
-        filename="test/{}-{}-cs_python.xyz".format(p.replace("/", "_"), n),
+        dots, filename="test/{}-{}-cs_python.xyz".format(p.replace("/", "_"), n),
     )
 
 

@@ -3,8 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
-
-from core import mkdir_by_file
+from sitemap.core import mkdir_by_file
 
 
 def to_pdb(coors, bfactor, filename="test.pdb"):
@@ -75,8 +74,7 @@ def to_xyz(data, ele="H", filename="test.xyz"):
     n_atom = int(t.shape[0])
     t.insert(0, "atom", ele)
     df1 = pd.DataFrame(
-        [[n_atom, "", "", ""], [filename, "", "", ""]],
-        columns=["atom", 0, 1, 2],
+        [[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],
     )
     res = pd.concat([df1, t])
     res.to_csv(filename, header=None, index=None, sep="\t")
@@ -90,13 +88,12 @@ def xyz2trj(datalist, ele="H", filename="test.xyz"):
         n_atom = int(t.shape[0])
         t.insert(0, "atom", ele)
         df1 = pd.DataFrame(
-            [[n_atom, "", "", ""], [filename, "", "", ""]],
-            columns=["atom", 0, 1, 2],
+            [[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],
         )
         df2 = pd.concat([df1, t])
         res.append(df2)
-    res = pd.concat(res)
-    res.to_csv(filename, header=None, index=None, sep="\t")
+    res2 = pd.concat(res)
+    res2.to_csv(filename, header=None, index=None, sep="\t")
 
 
 def read_xyz(filename, dir="."):
@@ -111,7 +108,7 @@ def read_xyz(filename, dir="."):
     return coor,elements #in numpy array
     """
     file_path = os.path.join(dir, filename)
-    df = pd.read_csv(file_path, header=None, sep="\s+", skiprows=2)
+    df = pd.read_csv(file_path, header=None, sep="\\s+", skiprows=2)
     coors = df.iloc[:, 1:].values
     eles = df.iloc[:, 0].values.astype("str")
     eles = np.char.upper(eles)  # convert to uppercase

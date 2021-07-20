@@ -8,8 +8,16 @@ return energy and gradient
 @author: likun.yang
 """
 import numpy as np
-
-from uff_bond import *
+from sitemap.conformation.uff_bond import (
+    cal_real_bond_length,
+    get_AC,
+    get_atom_type,
+    get_bond_list,
+    get_bond_order,
+    get_distance,
+    get_distance_matrix,
+    get_uff_par,
+)
 
 
 def get_bonds_v2(coors, eles):
@@ -77,9 +85,7 @@ def cal_angle_force_constant(atom_type_i, atom_type_j, atom_type_k, theta0):
 
     preFactor = beta * Z1_1 * Z1_3 / int(np.power(r13, 5))
     rTerm = r12 * r23
-    innerBit = (
-        3.0 * rTerm * (1.0 - cosTheta0 * cosTheta0) - r13 * r13 * cosTheta0
-    )
+    innerBit = 3.0 * rTerm * (1.0 - cosTheta0 * cosTheta0) - r13 * r13 * cosTheta0
     res = preFactor * rTerm * innerBit
     return res
 
@@ -111,9 +117,7 @@ def cal_energy_expansion_coeff(theta0):
 
 
 def cal_dE_dtheta(forceConstant, d_C1, d_C2, sinTheta, sin2Theta):
-    dE_dTheta = (
-        -1.0 * forceConstant * (d_C1 * sinTheta + 2.0 * d_C2 * sin2Theta)
-    )
+    dE_dTheta = -1.0 * forceConstant * (d_C1 * sinTheta + 2.0 * d_C2 * sin2Theta)
     return dE_dTheta
 
 
@@ -138,9 +142,7 @@ def cal_angle_energy_grad(angle, coors, eles):
     pos_b = coors[atom_j]
     pos_c = coors[atom_k]
 
-    force_cons = cal_angle_force_constant(
-        atom_type_i, atom_type_j, atom_type_k, theta0
-    )
+    force_cons = cal_angle_force_constant(atom_type_i, atom_type_j, atom_type_k, theta0)
 
     d_C0, d_C1, d_C2 = cal_energy_expansion_coeff(theta0)
     # angle between 2 bonds that construct the angle
@@ -168,12 +170,8 @@ def cal_angle_energy_grad(angle, coors, eles):
     sin2Theta = 2.0 * sinTheta * cosTheta
 
     dE_dTheta = cal_dE_dtheta(force_cons, d_C1, d_C2, sinTheta, sin2Theta)
-    dTheta_dPos_a = (
-        1 / dist_ba * (norm_cb_vec - cosTheta * norm_ab_vec)
-    ) / -sinTheta
-    dTheta_dPos_c = (
-        1 / dist_bc * (norm_ab_vec - cosTheta * norm_cb_vec)
-    ) / -sinTheta
+    dTheta_dPos_a = (1 / dist_ba * (norm_cb_vec - cosTheta * norm_ab_vec)) / -sinTheta
+    dTheta_dPos_c = (1 / dist_bc * (norm_ab_vec - cosTheta * norm_cb_vec)) / -sinTheta
     grad_a = dE_dTheta * dTheta_dPos_a
     grad_c = dE_dTheta * dTheta_dPos_c
     grad_b = -(grad_a + grad_c)
@@ -228,4 +226,3 @@ def get_angles_energy_grad(coors, eles):
         grad[atom_j] += tmp[2]
         grad[atom_k] += tmp[3]
     return (E, grad)
-

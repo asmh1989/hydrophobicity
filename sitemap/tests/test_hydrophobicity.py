@@ -2,12 +2,11 @@ import logging
 import math
 
 import numpy as np
-
-from electrostatic import run_electrosatatic
-from find_pocket import find_pocket, layer_grids
-from hydrophobicity import cal_grids_hydro, run_hydro
-from mol_surface import sa_surface
-from pdb_io import read_pdb, to_pdb
+from sitemap.hydrophobicity.electrostatic import run_electrosatatic
+from sitemap.hydrophobicity.find_pocket import find_pocket, layer_grids
+from sitemap.hydrophobicity.hydrophobicity import cal_grids_hydro, run_hydro
+from sitemap.hydrophobicity.mol_surface import sa_surface
+from sitemap.hydrophobicity.pdb_io import read_pdb, to_pdb
 
 logger = logging.getLogger(__name__)
 
@@ -835,4 +834,4 @@ def test_cutom_hydro():
 
     print("hyo ", result)
 
-    print(result.tolist(), file=open("e.json", "w"))
+    print(result.tolist(), file=open("test/e.json", "w"))

@@ -38,14 +38,7 @@ vscode 建议配置如下
     "python.formatting.provider": "black",
     "editor.codeActionsOnSave": {
         "source.organizeImports": true
-    },
-    "python.formatting.blackArgs": [
-        "--line-length=80"
-    ],
-    "python.linting.flake8Args": [
-        "--max-line-length=80",
-        "--ignore=E203, W503"
-    ]
+    }
 }
 ```
 

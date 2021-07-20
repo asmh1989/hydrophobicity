@@ -6,11 +6,11 @@ SteepestDescent optimzer
 @Date     :2021/06/07 14:23:13
 @Author      :likun.yang
 """
-import copy
+# import copy
 
 import numpy as np
 
-from uff_nonBonded import *
+# from sitemap.conformation.uff_nonBonded import *
 
 
 def test_f(x):
@@ -38,9 +38,7 @@ def IsNear(a, b, epsilon):
 def normalizeGrad(grad):
     """
     project grad to [-1,1]
-
     grad = grad - grad.mean(axis=0) / grad.max(axis=0) - grad.min(axis=0)
-   
     """
     a = grad - grad.mean(axis=0)
     b = grad.max(axis=0) - grad.min(axis=0)

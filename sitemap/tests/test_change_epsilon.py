@@ -34,9 +34,7 @@ def task(mol_H, id, maxIter, epilon):
     prop.SetMMFFDielectricConstant(
         epilon
     )  # change dielectric constant, default value is 1
-    ff = AllChem.MMFFGetMoleculeForceField(
-        molCopy, prop, confId=id
-    )  # load force filed
+    ff = AllChem.MMFFGetMoleculeForceField(molCopy, prop, confId=id)  # load force filed
     ff.Initialize()
     ff.Minimize(maxIter)  # minimize the confs
     mol_H.AddConformer(molCopy.GetConformer(int(id)))
@@ -49,9 +47,7 @@ def task(mol_H, id, maxIter, epilon):
 def change_epsilon_fast(mol_H, epilon=1, maxIter=200):
     """并行化"""
     res = []
-    with concurrent.futures.ProcessPoolExecutor(
-        max_workers=cpu_count()
-    ) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count()) as executor:
         futures = [
             executor.submit(task, mol_H, id, maxIter, epilon)
             for id in range(mol_H.GetNumConformers())

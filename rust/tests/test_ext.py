@@ -116,9 +116,7 @@ def test_cal_electro2():
     n:介质的介电常数
     """
     n = 4
-    tmp = np.sqrt(np.sum(np.square(grid[:3] - atoms[:, :3]), axis=1)).dot(
-        atoms[:, -1]
-    )
+    tmp = np.sqrt(np.sum(np.square(grid[:3] - atoms[:, :3]), axis=1)).dot(atoms[:, -1])
     return (1 / (4 * np.pi * n)) * tmp
 
 
@@ -132,7 +130,7 @@ def test_sa_surface():
     # elements = ['C', 'O']
     elements = np.array(["C", "O", "CD1"])
 
-    dots = sa_surface(coor, elements, 5, 1.4)
+    dots = sa_surface(coor, elements, 5, 1.4, False)
     # dot2 = np.array(dots)
     print("dots flags: ", dots.shape)
 

@@ -19,9 +19,9 @@ import pandas as pd
 
 # from rdkit import Chem
 
-uff_par_path = "/home/yanglikun/git/protein/conformation/data/uff.par"
+uff_par_path = "protein/conformation/data/uff.par"
 
-uff_par = pd.read_csv(uff_par_path, sep="\s+", skiprows=148)  # load the uff par
+uff_par = pd.read_csv(uff_par_path, sep="\\s+", skiprows=148)  # load the uff par
 
 """
 par meaning
@@ -65,7 +65,7 @@ def read_xyz(filename, dir="."):
     return coor,elements #in numpy array
     """
     file_path = os.path.join(dir, filename)
-    df = pd.read_csv(file_path, header=None, sep="\s+", skiprows=2)
+    df = pd.read_csv(file_path, header=None, sep="\\s+", skiprows=2)
     coors = df.iloc[:, 1:].values
     eles = df.iloc[:, 0].values.astype("str")
     eles = np.char.upper(eles)  # convert to uppercase
@@ -211,10 +211,7 @@ def cal_real_bond_length(bondorder, atom_type_i, atom_type_j):
 
     # O'Keefe and Breese electronegativity correction
     r_en = (
-        r1_i
-        * r1_j
-        * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2
-        / (Xi_i * r1_i + Xi_j * r1_j)
+        r1_i * r1_j * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2 / (Xi_i * r1_i + Xi_j * r1_j)
     )
 
     res = r1_i + r1_j + r_bo - r_en
@@ -258,4 +255,3 @@ def get_bonds_energy_grad(coors, elemets):
         grad[atom_i] += G
         grad[atom_j] -= G
     return (E, grad)
-

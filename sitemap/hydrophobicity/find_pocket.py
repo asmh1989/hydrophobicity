@@ -10,11 +10,10 @@ Created on Mon Apr 12 09:03:24 2021
 
 import numpy as np
 import pandas as pd
+from sitemap.core import vdw_radii
+from sitemap.hydrophobicity.mol_surface import sa_surface
 from sz_py_ext import find_layer
 from sz_py_ext import find_pocket as find_pocket_rust
-
-from core import vdw_radii
-from mol_surface import sa_surface
 
 probe_radiis = {
     7.0: -993,
@@ -105,9 +104,7 @@ def find_pocket(atoms_coors, elements, n=40, pas_r=20, enable_ext=True):
     if enable_ext:
         return find_pocket_rust(atoms_coors, elements, n, pas_r)
 
-    pas = sa_surface(
-        atoms_coors, elements, n=n, pr=pas_r, enable_ext=True, index=False
-    )
+    pas = sa_surface(atoms_coors, elements, n=n, pr=pas_r, enable_ext=True, index=False)
     pocket_grids = gen_grid(atoms_coors, n=1)
     pocket_grids = sas_search_del(atoms_coors, elements, pocket_grids, pr=1.4)
     pocket_grids = pas_search_for_pocket(pocket_grids, pas, n=n, pr=pas_r)
