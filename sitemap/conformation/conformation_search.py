@@ -20,14 +20,13 @@ from matplotlib import pyplot as plt
 from rdkit import Chem
 from rdkit.Chem import AllChem, rdMolAlign
 from rdkit.ML.Cluster import Butina
+
 from sitemap.hydrophobicity.mol_surface import sa_surface
 
 # import sys
 
 
-platinum_diverse_dataset_path = (
-    "protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
-)
+platinum_diverse_dataset_path = "protein/conformation/dataset/platinum_diverse_dataset_2017_01.sdf"
 bostrom_path = "protein/conformation/dataset/bostrom.sdf"
 platinum_diverse_dataset = Chem.SDMolSupplier(platinum_diverse_dataset_path)
 bostrom_dataset = Chem.SDMolSupplier(bostrom_path)
@@ -48,12 +47,8 @@ def process_mol(sdfMol):
 
 ###################################################################################
 def ChangeEpsilon(mol_H, id, maxIter, epilon):
-    prop = AllChem.MMFFGetMoleculeProperties(
-        mol_H, mmffVariant="MMFF94s"
-    )  # get MMFF prop
-    prop.SetMMFFDielectricConstant(
-        epilon
-    )  # change dielectric constant, default value is 1
+    prop = AllChem.MMFFGetMoleculeProperties(mol_H, mmffVariant="MMFF94s")  # get MMFF prop
+    prop.SetMMFFDielectricConstant(epilon)  # change dielectric constant, default value is 1
     ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=id)  # load force filed
     ff.Initialize()
     ff.Minimize(maxIter)  # minimize the confs
@@ -65,10 +60,7 @@ def ChangeEpsilonParallel(mol_H, epilon=1, maxIter=200):
     """并行化"""
     res = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-        futures = [
-            executor.submit(ChangeEpsilon, mol_H, id, maxIter, epilon)
-            for id in range(mol_H.GetNumConformers())
-        ]
+        futures = [executor.submit(ChangeEpsilon, mol_H, id, maxIter, epilon) for id in range(mol_H.GetNumConformers())]
         for future in concurrent.futures.as_completed(futures):
             # add result to total data
             res.append(future.result())
@@ -83,17 +75,11 @@ def ChangeEpsilonParallel(mol_H, epilon=1, maxIter=200):
 def change_epsilon(mol_H, epilon=1, maxIter=0):
     """可以并行化"""
     ens = []
-    prop = AllChem.MMFFGetMoleculeProperties(
-        mol_H, mmffVariant="MMFF94s"
-    )  # get MMFF prop
-    prop.SetMMFFDielectricConstant(
-        epilon
-    )  # change dielectric constant, default value is 1
+    prop = AllChem.MMFFGetMoleculeProperties(mol_H, mmffVariant="MMFF94s")  # get MMFF prop
+    prop.SetMMFFDielectricConstant(epilon)  # change dielectric constant, default value is 1
 
     for id in range(mol_H.GetNumConformers()):
-        ff = AllChem.MMFFGetMoleculeForceField(
-            mol_H, prop, confId=id
-        )  # load force filed
+        ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=id)  # load force filed
         # ff.Minimize(maxIter)  # minimize the confs
         en = ff.CalcEnergy()
         ens.append(en)
@@ -112,12 +98,7 @@ def gen_conf(mol, RmsThresh=0.1, randomSeed=1, numThreads=0):
     mol_H = Chem.AddHs(mol)
     AllChem.EmbedMolecule(mol_H, randomSeed=1)
     AllChem.EmbedMultipleConfs(
-        mol_H,
-        numConfs=nc,
-        maxAttempts=1000,
-        randomSeed=randomSeed,
-        pruneRmsThresh=RmsThresh,
-        numThreads=numThreads,
+        mol_H, numConfs=nc, maxAttempts=1000, randomSeed=randomSeed, pruneRmsThresh=RmsThresh, numThreads=numThreads,
     )  # randomSeed 为了复现结果 #numThreads=0 means use all theads aviliable
     return mol_H
 
@@ -146,9 +127,7 @@ def calc_energy(mol_H, minimizeIts=200):
 
 
 def calcConfEnergy(mol_H, maxIters=0):
-    res = AllChem.MMFFOptimizeMoleculeConfs(
-        mol_H, mmffVariant="MMFF94s", maxIters=maxIters, numThreads=0
-    )
+    res = AllChem.MMFFOptimizeMoleculeConfs(mol_H, mmffVariant="MMFF94s", maxIters=maxIters, numThreads=0)
     return np.array(res)[:, 1]
 
 
@@ -195,9 +174,7 @@ def getButinaClusters(mol_H, RmstThresh=0.5):
     molNoH = Chem.RemoveHs(mol_H)
     numConfs = molNoH.GetNumConformers()
     rmsma = AllChem.GetConformerRMSMatrix(molNoH)
-    ButinaClusters = Butina.ClusterData(
-        rmsma, numConfs, distThresh=RmstThresh, isDistData=True, reordering=True
-    )
+    ButinaClusters = Butina.ClusterData(rmsma, numConfs, distThresh=RmstThresh, isDistData=True, reordering=True)
     return ButinaClusters
 
 
@@ -277,9 +254,7 @@ def changeEnergyBaseOnSASNoUse(en, sasa, coff=100):
     return en - coff * sasa
 
 
-def run_Conf_Search(
-    sdf_dataset, sample_size=100, cutEnergy=25, RmstThresh=1, coff=0.1, epilon=1
-):
+def run_Conf_Search(sdf_dataset, sample_size=100, cutEnergy=25, RmstThresh=1, coff=0.1, epilon=1):
     # num_mols = len(sdf_dataset)
     counter_1 = 0
     counter_2 = 0
@@ -292,9 +267,7 @@ def run_Conf_Search(
     for id in random_ll:
         sdf_mol = sdf_dataset[int(id)]
         mol = process_mol(sdf_mol)
-        mol_H = gen_conf(
-            mol, RmsThresh=0.5, randomSeed=1, numThreads=0
-        )  # confs stored in side the mol object
+        mol_H = gen_conf(mol, RmsThresh=0.5, randomSeed=1, numThreads=0)  # confs stored in side the mol object
         confEnergies = change_epsilon(mol_H, epilon=epilon)
         # confEnergies = calcConfEnergy(mol_H, maxIters=0)  #  get its energy
         # confEnergies = ChangeEpsilonParallel(mol_H, epilon=epilon)

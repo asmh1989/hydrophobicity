@@ -9,7 +9,6 @@ return energy and gradient
 
 
 import numpy as np
-
 from uff_bond import get_atom_type, get_distance, get_uff_par
 
 

@@ -2,6 +2,7 @@ import logging
 import math
 
 import numpy as np
+
 from sitemap.hydrophobicity.electrostatic import run_electrosatatic
 from sitemap.hydrophobicity.find_pocket import find_pocket, layer_grids
 from sitemap.hydrophobicity.hydrophobicity import cal_grids_hydro, run_hydro
@@ -22,11 +23,7 @@ def test_6fs6_run_hydro_rust():
     h = run_hydro(pdb, dir="test", n=100)
     hyo = h[:, 3]
     logger.info(
-        "hyo max = %s, min = %s, m = %s, len = %s",
-        np.max(hyo),
-        np.min(hyo),
-        np.mean(hyo),
-        hyo.shape[0],
+        "hyo max = %s, min = %s, m = %s, len = %s", np.max(hyo), np.min(hyo), np.mean(hyo), hyo.shape[0],
     )
     assert math.isclose(80.74128537450976, np.max(hyo), rel_tol=1e-6)
     assert math.isclose(-228.6843365052476, np.min(hyo), rel_tol=1e-6)
@@ -47,11 +44,7 @@ def test_4ey5_run_hydro_rust():
     h = run_hydro(pdb, dir="test", n=100)
     hyo = h[:, 3]
     logger.info(
-        "hyo max = %s, min = %s, m = %s, len = %s",
-        np.max(hyo),
-        np.min(hyo),
-        np.mean(hyo),
-        hyo.shape[0],
+        "hyo max = %s, min = %s, m = %s, len = %s", np.max(hyo), np.min(hyo), np.mean(hyo), hyo.shape[0],
     )
     assert math.isclose(76.50174143608243, np.max(hyo), rel_tol=1e-6)
     assert math.isclose(-197.84444459826696, np.min(hyo), rel_tol=1e-6)
@@ -68,11 +61,7 @@ def test_6fs6_run_hydro_python():
     hyo = h[:, 3]
 
     logger.info(
-        "hyo max = %s, min = %s, m = %s, len = %s",
-        np.max(hyo),
-        np.min(hyo),
-        np.mean(hyo),
-        hyo.shape[0],
+        "hyo max = %s, min = %s, m = %s, len = %s", np.max(hyo), np.min(hyo), np.mean(hyo), hyo.shape[0],
     )
     logging.info("test_run_hydro_python done ...")
 

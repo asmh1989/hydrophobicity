@@ -2,10 +2,10 @@
 
 * conda 环境
 
-* biopandas
+* 运行`deps.sh` 脚本python 第三方依赖库
 
 ```
-conda install -c conda-forge biopandas
+./deps.sh
 ```
 
 ## 编译python 扩展
@@ -50,3 +50,15 @@ vscode 建议配置如下
 * `python`代码格式化使用`black`
 * `python lint`使用`flake8`
 * `python`代码使用`isort`自动排序`import`
+
+
+```
+# 格式化 python 代码
+black sitemap  
+
+# python lint
+flake8 sitemap
+
+# isort
+isort sitemap --profile black
+```

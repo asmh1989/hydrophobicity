@@ -8,6 +8,7 @@ return energy and gradient
 @author: likun.yang
 """
 import numpy as np
+
 from sitemap.conformation.uff_bond import (
     cal_real_bond_length,
     get_AC,

@@ -1,0 +1,19 @@
+[tool.black]
+line-length = 120 # override black's default line-length
+exclude = '''
+/(
+    \.git
+  | \.pytest_cache
+  | __pycache
+  | venv
+  | \.venv
+  | _build
+  | rust
+  | build
+  | data
+)/
+'''
+
+[tool.isort]
+# make it compatible with black
+profile = "black"

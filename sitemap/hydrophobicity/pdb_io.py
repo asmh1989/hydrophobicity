@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from biopandas.pdb import PandasPdb
+
 from sitemap.core import mkdir_by_file
 
 
@@ -73,9 +74,7 @@ def to_xyz(data, ele="H", filename="test.xyz"):
     t = pd.DataFrame(data)
     n_atom = int(t.shape[0])
     t.insert(0, "atom", ele)
-    df1 = pd.DataFrame(
-        [[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],
-    )
+    df1 = pd.DataFrame([[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],)
     res = pd.concat([df1, t])
     res.to_csv(filename, header=None, index=None, sep="\t")
 
@@ -87,9 +86,7 @@ def xyz2trj(datalist, ele="H", filename="test.xyz"):
         t = pd.DataFrame(data)
         n_atom = int(t.shape[0])
         t.insert(0, "atom", ele)
-        df1 = pd.DataFrame(
-            [[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],
-        )
+        df1 = pd.DataFrame([[n_atom, "", "", ""], [filename, "", "", ""]], columns=["atom", 0, 1, 2],)
         df2 = pd.concat([df1, t])
         res.append(df2)
     res2 = pd.concat(res)

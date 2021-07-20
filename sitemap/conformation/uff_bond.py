@@ -210,9 +210,7 @@ def cal_real_bond_length(bondorder, atom_type_i, atom_type_j):
     r_bo = -0.1332 * (r1_i + r1_j) * np.log(bondorder)
 
     # O'Keefe and Breese electronegativity correction
-    r_en = (
-        r1_i * r1_j * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2 / (Xi_i * r1_i + Xi_j * r1_j)
-    )
+    r_en = r1_i * r1_j * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2 / (Xi_i * r1_i + Xi_j * r1_j)
 
     res = r1_i + r1_j + r_bo - r_en
     return res
@@ -247,9 +245,7 @@ def get_bonds_energy_grad(coors, elemets):
     for bond in bond_list:
         atom_i = bond[0]
         atom_j = bond[1]
-        tmp = cal_bond_energy_and_grad(
-            bond, bond_order, coors, elemets, distance_matrix
-        )
+        tmp = cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix)
         E += tmp[0]
         G = tmp[1]
         grad[atom_i] += G

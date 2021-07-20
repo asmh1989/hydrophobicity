@@ -15,9 +15,10 @@ representations
 """
 
 import numpy as np
-from sitemap.core import vdw_radii
 from sz_py_ext import sa_surface as sa_surface_rust
 from sz_py_ext import sa_surface_no_ele as sa_surface_no_ele_rust
+
+from sitemap.core import vdw_radii
 
 goldenRatio = (1 + 5 ** 0.5) / 2
 
@@ -96,9 +97,7 @@ def connolly_surface(coors, elements, n=50, pr=1.4, enable_ext=True):
     r:比vdw半径伸长的半径
     """
     sas_points = sa_surface(coors, elements, n=n, pr=pr, enable_ext=enable_ext)  # 生成sas
-    dots = sa_surface_no_ele(
-        sas_points[:, :-1], n=n, pr=pr, enable_ext=enable_ext
-    )  # 以sas为球心，pr为半径做球
+    dots = sa_surface_no_ele(sas_points[:, :-1], n=n, pr=pr, enable_ext=enable_ext)  # 以sas为球心，pr为半径做球
     # return dots
 
     # 开始去除探测小球最外面的点, 认为离原子距离的平方小于10.01都是内层的点

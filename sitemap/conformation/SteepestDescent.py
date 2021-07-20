@@ -63,12 +63,8 @@ def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
         # print("energy= {:6.2f}".format(Energy))
         print("grandient= \n{}".format(grad.round(2)))
         tempStep = -grad * step
-        newStep = np.where(
-            tempStep > trustRadius, trustRadius, tempStep
-        )  # positive big step
-        newStep = np.where(
-            newStep < -trustRadius, -trustRadius, newStep
-        )  # negative big step4
+        newStep = np.where(tempStep > trustRadius, trustRadius, tempStep)  # positive big step
+        newStep = np.where(newStep < -trustRadius, -trustRadius, newStep)  # negative big step4
         # if np.all(np.abs(newStep) < torerance):
         #    break
         currrent_pos += newStep  # update positon

@@ -8,11 +8,12 @@ Created on Tue Apr 20 16:37:11 2021
 """
 import numpy as np
 import pandas as pd
+from sz_py_ext import run_hydrophobicity
+
 from sitemap.core import mkdir_by_file, vdw_radii
 from sitemap.hydrophobicity.find_pocket import layer_grids
 from sitemap.hydrophobicity.mol_surface import sa_surface
 from sitemap.hydrophobicity.pdb_io import read_pdb, to_pdb, to_xyz
-from sz_py_ext import run_hydrophobicity
 
 atomic_hydrophobicity_file_path = "data/atomic_hydrophobicity.csv"
 atomic_hydrophobicity = pd.read_csv(atomic_hydrophobicity_file_path).iloc[:, :3].values
@@ -26,12 +27,7 @@ def get_atomic_sovation_para(resn, atom):
     elif atom == "NA":
         atomic_sovation_para = -12  # 因为pandas读取时会错误的将‘NA’认为 na（missing value)
     else:
-        index = np.where(
-            (
-                (atomic_hydrophobicity[:, 0] == resn)
-                & (atomic_hydrophobicity[:, 1] == atom)
-            )
-        )
+        index = np.where(((atomic_hydrophobicity[:, 0] == resn) & (atomic_hydrophobicity[:, 1] == atom)))
         atomic_sovation_para = atomic_hydrophobicity[index, 2]
     return atomic_sovation_para
 
@@ -107,9 +103,7 @@ def cal_hydro_atoms(felt_atoms):
     return hydro_atom
 
 
-def cal_grids_hydro(
-    layerd_grids, atom_coors, elements, resns, solvent_accessible_points, n=40
-):
+def cal_grids_hydro(layerd_grids, atom_coors, elements, resns, solvent_accessible_points, n=40):
     """
     for all grid points
     pas_r: probe radii
@@ -119,9 +113,7 @@ def cal_grids_hydro(
     atom_hydro = np.zeros(len(layerd_grids))
     water_hydro = np.zeros(len(layerd_grids))
     for index, grid in enumerate(layerd_grids):
-        felt_atoms = find_within_radii_atoms(
-            grid, atom_coors, elements, resns, solvent_accessible_points, n=n
-        )
+        felt_atoms = find_within_radii_atoms(grid, atom_coors, elements, resns, solvent_accessible_points, n=n)
         atom_hydro[index] = cal_hydro_atoms(felt_atoms)
         new_layerd_grid = find_within_radii_grids(grid, layerd_grids)
         water_hydro[index] = new_layerd_grid

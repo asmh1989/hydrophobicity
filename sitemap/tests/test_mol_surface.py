@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+
 from sitemap.hydrophobicity.find_pocket import find_pocket, layer_grids
 from sitemap.hydrophobicity.mol_surface import connolly_surface, sa_surface
 from sitemap.hydrophobicity.pdb_io import read_pdb, to_xyz

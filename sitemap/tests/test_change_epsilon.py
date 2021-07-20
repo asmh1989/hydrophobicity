@@ -11,29 +11,19 @@ logger = logging.getLogger(__name__)
 
 def change_epsilon(mol_H, epilon=1, maxIter=200):
     """可以并行化"""
-    prop = AllChem.MMFFGetMoleculeProperties(
-        mol_H, mmffVariant="MMFF94s"
-    )  # get MMFF prop
-    prop.SetMMFFDielectricConstant(
-        epilon
-    )  # change dielectric constant, default value is 1
+    prop = AllChem.MMFFGetMoleculeProperties(mol_H, mmffVariant="MMFF94s")  # get MMFF prop
+    prop.SetMMFFDielectricConstant(epilon)  # change dielectric constant, default value is 1
 
     for id in range(mol_H.GetNumConformers()):
-        ff = AllChem.MMFFGetMoleculeForceField(
-            mol_H, prop, confId=id
-        )  # load force filed
+        ff = AllChem.MMFFGetMoleculeForceField(mol_H, prop, confId=id)  # load force filed
         ff.Minimize(maxIter)  # minimize the confs
 
 
 def task(mol_H, id, maxIter, epilon):
     molCopy = copy.deepcopy(mol_H)
     mol_H.RemoveAllConformers()
-    prop = AllChem.MMFFGetMoleculeProperties(
-        molCopy, mmffVariant="MMFF94s"
-    )  # get MMFF prop
-    prop.SetMMFFDielectricConstant(
-        epilon
-    )  # change dielectric constant, default value is 1
+    prop = AllChem.MMFFGetMoleculeProperties(molCopy, mmffVariant="MMFF94s")  # get MMFF prop
+    prop.SetMMFFDielectricConstant(epilon)  # change dielectric constant, default value is 1
     ff = AllChem.MMFFGetMoleculeForceField(molCopy, prop, confId=id)  # load force filed
     ff.Initialize()
     ff.Minimize(maxIter)  # minimize the confs
@@ -48,10 +38,7 @@ def change_epsilon_fast(mol_H, epilon=1, maxIter=200):
     """并行化"""
     res = []
     with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count()) as executor:
-        futures = [
-            executor.submit(task, mol_H, id, maxIter, epilon)
-            for id in range(mol_H.GetNumConformers())
-        ]
+        futures = [executor.submit(task, mol_H, id, maxIter, epilon) for id in range(mol_H.GetNumConformers())]
         for future in concurrent.futures.as_completed(futures):
             # add result to total data
             res.append(future.result())

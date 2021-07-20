@@ -10,10 +10,11 @@ Created on Mon Apr 12 09:03:24 2021
 
 import numpy as np
 import pandas as pd
-from sitemap.core import vdw_radii
-from sitemap.hydrophobicity.mol_surface import sa_surface
 from sz_py_ext import find_layer
 from sz_py_ext import find_pocket as find_pocket_rust
+
+from sitemap.core import vdw_radii
+from sitemap.hydrophobicity.mol_surface import sa_surface
 
 probe_radiis = {
     7.0: -993,
