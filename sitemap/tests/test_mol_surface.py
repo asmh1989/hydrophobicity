@@ -77,13 +77,14 @@ def test_find_pockets_rust2():
     assert grids.shape[0] == 6460
 
 
-def test_find_pockets_python():
-    n = 100
-    p = pdb_4ey5
-    c, e, r = read_pdb(p)
-    grids = find_pocket(c, e, n, 20, enable_ext=False)
-    print("grids = ", grids.shape)
-    assert grids.shape[0] == 14389
+# 运行过慢注释
+# def test_find_pockets_python():
+#     n = 100
+#     p = pdb_4ey5
+#     c, e, r = read_pdb(p)
+#     grids = find_pocket(c, e, n, 20, enable_ext=False)
+#     print("grids = ", grids.shape)
+#     assert grids.shape[0] == 14389
 
 
 def test_find_pockets_python2():
@@ -108,17 +109,18 @@ def test_find_layer_rust():
     assert grids[dm == -64].shape[0] == 593
 
 
-def test_find_layer_python():
-    logger.info("test_find_layer_python...")
-    n = 100
-    p = pdb_4ey5
-    c, e, r = read_pdb(p)
-    logger.info("start find layer...")
-    grids = layer_grids(c, e, n, 20, False)
-    logger.info("grids = %s", grids.shape)
-    dm = grids[:, 3]
-    assert grids[dm == -993].shape[0] == 9660
-    assert grids[dm == -64].shape[0] == 593
+#  运行过慢注释
+# def test_find_layer_python():
+#     logger.info("test_find_layer_python...")
+#     n = 100
+#     p = pdb_4ey5
+#     c, e, r = read_pdb(p)
+#     logger.info("start find layer...")
+#     grids = layer_grids(c, e, n, 20, False)
+#     logger.info("grids = %s", grids.shape)
+#     dm = grids[:, 3]
+#     assert grids[dm == -993].shape[0] == 9660
+#     assert grids[dm == -64].shape[0] == 593
 
 
 def test_custom_data():

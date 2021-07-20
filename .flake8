@@ -17,5 +17,6 @@ exclude =
     ./.git,
     ./.vscode,
     ./data,
+    ./doc,
     ./build,
     *.pyi
