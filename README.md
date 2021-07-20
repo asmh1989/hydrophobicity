@@ -35,10 +35,16 @@ vscode 建议配置如下
     "python.linting.pylintEnabled": false,
     "python.linting.mypyEnabled": false,
     "python.linting.pycodestyleEnabled": false,
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        }
+    },
     "python.formatting.provider": "black",
-    "editor.codeActionsOnSave": {
-        "source.organizeImports": true
-    }
+    "python.sortImports.args": [
+        "--profile",
+        "black"
+    ],
 }
 ```
 

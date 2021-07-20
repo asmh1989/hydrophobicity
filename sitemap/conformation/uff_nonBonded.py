@@ -19,7 +19,6 @@ def calcNonbondedMinimum(atom_type_i, atom_type_j):
 
 
 def calcNonbondedDepth(atom_type_i, atom_type_j):
-
     D1_i = get_uff_par(atom_type_i, "D1")
     D1_j = get_uff_par(atom_type_j, "D1")
     return np.sqrt(D1_i * D1_j)
