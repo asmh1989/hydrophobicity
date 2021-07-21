@@ -51,12 +51,12 @@ vscode 建议配置如下
 * 所需插件
     * `python vscode`插件
 
-### 代码格式, lint相关
+### 代码格式, lint, test相关
 
 * `python`代码格式化使用`black`
 * `python lint`使用`flake8`
 * `python`代码使用`isort`自动排序`import`
-
+* `pytest` 作为`python`代码测试框架
 
 ```
 # 格式化 python 代码
