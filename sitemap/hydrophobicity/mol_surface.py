@@ -20,7 +20,7 @@ from sz_py_ext import sa_surface_no_ele as sa_surface_no_ele_rust
 
 from sitemap.core import vdw_radii
 
-goldenRatio = (1 + 5 ** 0.5) / 2
+GoldenRatio = (1 + 5 ** 0.5) / 2
 
 
 def dotsphere(n=100):
@@ -30,7 +30,7 @@ def dotsphere(n=100):
     下一步根据原子的坐标平移单位圆"""
 
     i = np.arange(0, n)
-    theta = 2 * np.pi * i / goldenRatio
+    theta = 2 * np.pi * i / GoldenRatio
     phi = np.arccos(1 - 2 * (i + 0.5) / n)
     x, y, z = (
         np.cos(theta) * np.sin(phi),

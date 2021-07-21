@@ -28,14 +28,14 @@ def test2(a):
     return (e, (gx, gy))
 
 
-def IsNear(a, b, epsilon):
+def is_near(a, b, epsilon):
     """
     returns abs(a - b) < epsilon
     """
     return np.abs(a - b) < epsilon
 
 
-def normalizeGrad(grad):
+def normalize_grad(grad):
     """
     project grad to [-1,1]
     grad = grad - grad.mean(axis=0) / grad.max(axis=0) - grad.min(axis=0)
@@ -46,31 +46,31 @@ def normalizeGrad(grad):
     return c
 
 
-def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
+def steepest_descent(func, coors, eles, max_iter=100, torerance=1e-05):
     currrent_pos = coors.astype("float64")
     step = 0.2
-    trustRadius = 0.75
+    trust_radius = 0.75
     counter = 0
     trj = []
     energy = []
     e1 = 1e09
-    for _ in range(maxIter):
+    for _ in range(max_iter):
         e1 = e1
         counter += 1
         e2, grad = func(currrent_pos, eles)
         energy.append(e2)
-        grad = normalizeGrad(grad)
+        grad = normalize_grad(grad)
         # print("energy= {:6.2f}".format(Energy))
         print("grandient= \n{}".format(grad.round(2)))
-        tempStep = -grad * step
-        newStep = np.where(tempStep > trustRadius, trustRadius, tempStep)  # positive big step
-        newStep = np.where(newStep < -trustRadius, -trustRadius, newStep)  # negative big step4
-        # if np.all(np.abs(newStep) < torerance):
+        temp_step = -grad * step
+        new_step = np.where(temp_step > trust_radius, trust_radius, temp_step)  # positive big step
+        new_step = np.where(new_step < -trust_radius, -trust_radius, new_step)  # negative big step4
+        # if np.all(np.abs(new_step) < torerance):
         #    break
-        currrent_pos += newStep  # update positon
+        currrent_pos += new_step  # update positon
         # print(currrent_pos)
         trj.append(np.array(currrent_pos))  # deep copy
-        if IsNear(e2, e1, 1.0e-6):
+        if is_near(e2, e1, 1.0e-6):
             break
         if e2 > e1:  # // decrease stepsize
             step *= 0.1
@@ -81,22 +81,22 @@ def steepest_descent(func, coors, eles, maxIter=100, torerance=1e-05):
                 step = 1.0
     print(counter)
     return (currrent_pos, trj, np.array(energy))
-    # # print(newStep)
+    # # print(new_step)
     #
 
     """
     # e_n2 = func(currrent_pos, eles)[0]
-    # if tempStep > trustRadius:  # positive big step # can use np.where
-    #     currrent_pos += trustRadius
-    # elif tempStep < -trustRadius:  # negative big step
-    #     currrent_pos -= trustRadius
+    # if temp_step > trust_radius:  # positive big step # can use np.where
+    #     currrent_pos += trust_radius
+    # elif temp_step < -trust_radius:  # negative big step
+    #     currrent_pos -= trust_radius
     # else:
-    #     currrent_pos += tempStep
+    #     currrent_pos += temp_step
 
     # print("e_n1 = {:6.2f}\n".format(e_n1))
     # print(currrent_pos)
 
-    # if IsNear(e_n2, e_n1, 1.0e-7):
+    # if is_near(e_n2, e_n1, 1.0e-7):
     #    break
     # if e_n2 > e_n1:  # // decrease stepsize
     #     step *= 0.1

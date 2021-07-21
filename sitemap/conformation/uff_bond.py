@@ -93,12 +93,12 @@ def get_distance_matrix(coors):
     return res
 
 
-def get_AC(coors, eles, distance_matrix, covalent_factor=1.3):
+def get_ac(coors, eles, distance_matrix, covalent_factor=1.3):
     """
 
     Generate adjacent matrix from atoms and coordinates.
 
-    AC is a (num_atoms, num_atoms) matrix with 1 being covalent bond and 0 is not
+    ac is a (num_atoms, num_atoms) matrix with 1 being covalent bond and 0 is not
 
     covalent_factor - 1.3 is an arbitrary factor
 
@@ -110,25 +110,25 @@ def get_AC(coors, eles, distance_matrix, covalent_factor=1.3):
         covalent_factor - increase covalent bond length threshold with facto
 
     returns:
-        AC - adjacent matrix
+        ac - adjacent matrix
 
     """
 
     # Calculate distance matrix
     # dMat = get_distance_matrix(coors)
     num_atoms = coors.shape[0]
-    AC = np.zeros((num_atoms, num_atoms), dtype=int)
+    ac = np.zeros((num_atoms, num_atoms), dtype=int)
     for i in range(num_atoms):
         a_i = eles[i]
-        Rcov_i = covalent_radii[a_i] * covalent_factor
+        rcov_i = covalent_radii[a_i] * covalent_factor
         for j in range(i + 1, num_atoms):
             a_j = eles[j]
-            Rcov_j = covalent_radii[a_j] * covalent_factor
-            if distance_matrix[i, j] < Rcov_i + Rcov_j:
-                AC[i, j] = 1
-                AC[j, i] = 1
+            rcov_j = covalent_radii[a_j] * covalent_factor
+            if distance_matrix[i, j] < rcov_i + rcov_j:
+                ac[i, j] = 1
+                ac[j, i] = 1
 
-    return AC
+    return ac
 
 
 def get_bond_order():
@@ -175,7 +175,7 @@ def get_uff_par(atom_type, term):
 
 def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
     """
-    E_bond = 1/2 * force_cons * (r_curr - r_optima)^2
+    e_bond = 1/2 * force_cons * (r_curr - r_optima)^2
     """
     atom_i = bond[0]
     atom_j = bond[1]
@@ -187,12 +187,12 @@ def cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix):
     print("R_desired = {}".format(r_desired))
     force_cons = cal_bond_force_cons(atom_type_i, atom_type_j, r_desired)
     # print("Force Constant = {:6.2f}".format(force_cons))
-    E_bond = 0.5 * force_cons * (r_curr - r_desired) ** 2
-    # print("Ebond = {:6.2f}".format(E_bond))
+    e_bond = 0.5 * force_cons * (r_curr - r_desired) ** 2
+    # print("Ebond = {:6.2f}".format(e_bond))
 
     u_vec = (coors[atom_i] - coors[atom_j]) / r_curr
-    G_bond = force_cons * (r_curr - r_desired) * u_vec
-    return (E_bond, G_bond)
+    g_bond = force_cons * (r_curr - r_desired) * u_vec
+    return (e_bond, g_bond)
 
 
 def cal_real_bond_length(bondorder, atom_type_i, atom_type_j):
@@ -203,25 +203,25 @@ def cal_real_bond_length(bondorder, atom_type_i, atom_type_j):
 
     r1_i = get_uff_par(atom_type_i, "r1")
     r1_j = get_uff_par(atom_type_j, "r1")
-    Xi_i = get_uff_par(atom_type_i, "Xi")
-    Xi_j = get_uff_par(atom_type_j, "Xi")
+    xi_i = get_uff_par(atom_type_i, "Xi")
+    xi_j = get_uff_par(atom_type_j, "Xi")
 
     # this is the pauling correction
     r_bo = -0.1332 * (r1_i + r1_j) * np.log(bondorder)
 
     # O'Keefe and Breese electronegativity correction
-    r_en = r1_i * r1_j * (np.sqrt(Xi_i) - np.sqrt(Xi_j)) ** 2 / (Xi_i * r1_i + Xi_j * r1_j)
+    r_en = r1_i * r1_j * (np.sqrt(xi_i) - np.sqrt(xi_j)) ** 2 / (xi_i * r1_i + xi_j * r1_j)
 
     res = r1_i + r1_j + r_bo - r_en
     return res
 
 
 def cal_bond_force_cons(atom_type_i, atom_type_j, r_ij_desired):
-    Z1_i = get_uff_par(atom_type_i, "Z1")
-    Z1_j = get_uff_par(atom_type_j, "Z1")
+    z1_i = get_uff_par(atom_type_i, "Z1")
+    z1_j = get_uff_par(atom_type_j, "Z1")
 
-    G = 332.06  # bond force constant prefactor
-    res = 2.0 * G * Z1_i * Z1_j / r_ij_desired ** 3
+    g = 332.06  # bond force constant prefactor
+    res = 2.0 * g * z1_i * z1_j / r_ij_desired ** 3
     return res
 
 
@@ -238,16 +238,16 @@ def get_bond_list(adjacent_matrix):
 def get_bonds_energy_grad(coors, elemets):
     bond_order = get_bond_order()
     distance_matrix = get_distance_matrix(coors)
-    ac = get_AC(coors, elemets, distance_matrix)
+    ac = get_ac(coors, elemets, distance_matrix)
     bond_list = get_bond_list(ac)
-    E = 0
+    e = 0
     grad = np.zeros(coors.shape)
     for bond in bond_list:
         atom_i = bond[0]
         atom_j = bond[1]
         tmp = cal_bond_energy_and_grad(bond, bond_order, coors, elemets, distance_matrix)
-        E += tmp[0]
-        G = tmp[1]
-        grad[atom_i] += G
-        grad[atom_j] -= G
-    return (E, grad)
+        e += tmp[0]
+        g = tmp[1]
+        grad[atom_i] += g
+        grad[atom_j] -= g
+    return (e, grad)

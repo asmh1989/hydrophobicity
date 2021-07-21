@@ -33,15 +33,15 @@ def group_pocket(isadjacent):
     res = []
     for i in range(grids_number):
         if i not in visited:
-            Q = deque([i])
+            q = deque([i])
             tmp = set()
-            while Q:
-                j = Q.popleft()
+            while q:
+                j = q.popleft()
                 visited.add(j)
                 tmp.add(j)
                 for k in range(grids_number):
                     if isadjacent[j, k] == 1 and k not in visited:
-                        Q.append(k)
+                        q.append(k)
                         tmp.add(k)
             res.append(tmp)
     return res

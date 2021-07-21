@@ -25,12 +25,13 @@ def test_sa_surface_rust(p=pdb):
     to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
 
 
-def test_sa_surface_python(p=pdb):
-    c, e, r = read_pdb(p)
-    dots = sa_surface(c, e, n=n, pr=1.4, enable_ext=False)
-    logger.info("dots = %s", dots.shape)
+# 运行太慢注释
+# def test_sa_surface_python(p=pdb):
+#     c, e, r = read_pdb(p)
+#     dots = sa_surface(c, e, n=n, pr=1.4, enable_ext=False)
+#     logger.info("dots = %s", dots.shape)
 
-    to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
+#     to_xyz(dots, filename="test/{}-{}-cs_rust.xyz".format(p.replace("/", "_"), n))
 
 
 def test_connolly_surface_rust(p=pdb):

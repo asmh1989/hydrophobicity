@@ -124,7 +124,7 @@ def cal_grids_hydro(layerd_grids, atom_coors, elements, resns, solvent_accessibl
 
 
 def run_hydro(filename, n=100, pas_r=20, dir=".", enable_ext=True):
-    mkdir_by_file(dir, isDir=True)
+    mkdir_by_file(dir, is_dir=True)
     atom_coors, eles, resns = read_pdb(filename)
 
     if enable_ext:

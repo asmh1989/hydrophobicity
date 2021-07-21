@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-def mkdir_by_file(path, isDir=False):
+def mkdir_by_file(path, is_dir=False):
     """
     新建上层目录
     """
@@ -9,7 +9,7 @@ def mkdir_by_file(path, isDir=False):
 
     p = Path(path)
 
-    if isDir is False:
+    if is_dir is False:
         p = p.parent
 
     if p.exists() is False:

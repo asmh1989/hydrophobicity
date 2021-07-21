@@ -12,31 +12,31 @@ import numpy as np
 from uff_bond import get_atom_type, get_distance, get_uff_par
 
 
-def calcNonbondedMinimum(atom_type_i, atom_type_j):
+def calc_nonbonded_minimum(atom_type_i, atom_type_j):
     x1_i = get_uff_par(atom_type_i, "x1")
     x1_j = get_uff_par(atom_type_j, "x1")
     return np.sqrt(x1_i * x1_j)
 
 
-def calcNonbondedDepth(atom_type_i, atom_type_j):
-    D1_i = get_uff_par(atom_type_i, "D1")
-    D1_j = get_uff_par(atom_type_j, "D1")
-    return np.sqrt(D1_i * D1_j)
+def calc_nonbonded_depth(atom_type_i, atom_type_j):
+    d1_i = get_uff_par(atom_type_i, "D1")
+    d1_j = get_uff_par(atom_type_j, "D1")
+    return np.sqrt(d1_i * d1_j)
 
 
-def calEnergy(r, d_wellDepth):
+def cal_energy(r, d_well_depth):
     r6 = np.power(r, 6)
     r12 = r6 * r6
-    res = d_wellDepth * (r12 - 2.0 * r6)
+    res = d_well_depth * (r12 - 2.0 * r6)
     return res
 
 
-def calGrad(r, d_wellDepth, d_xij, pos_i, pos_j, dist):
+def cal_grad(r, d_well_depth, d_xij, pos_i, pos_j, dist):
     r7 = np.power(r, 7)
     r13 = np.power(r, 13)
-    preFactor = 12.0 * d_wellDepth / d_xij * (r7 - r13)
-    dGrad = preFactor * (pos_i - pos_j) / dist
-    return dGrad
+    pre_factor = 12.0 * d_well_depth / d_xij * (r7 - r13)
+    d_grad = pre_factor * (pos_i - pos_j) / dist
+    return d_grad
 
 
 def get_energy_grad(coors, eles):
@@ -51,12 +51,12 @@ def get_energy_grad(coors, eles):
             atom_j = eles[j]
             pos_j = coors[j]
             atom_type_j = get_atom_type(atom_j)
-            d_xij = calcNonbondedMinimum(atom_type_i, atom_type_j)
-            d_wellDepth = calcNonbondedDepth(atom_type_i, atom_type_j)
+            d_xij = calc_nonbonded_minimum(atom_type_i, atom_type_j)
+            d_well_depth = calc_nonbonded_depth(atom_type_i, atom_type_j)
             dist = get_distance(pos_i, pos_j)
             r = d_xij / dist
-            e += calEnergy(r, d_wellDepth)
-            g = calGrad(r, d_wellDepth, d_xij, pos_i, pos_j, dist)
+            e += cal_energy(r, d_well_depth)
+            g = cal_grad(r, d_well_depth, d_xij, pos_i, pos_j, dist)
             grad[i] += g
             grad[j] -= g
     return (e, grad)
